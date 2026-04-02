@@ -799,7 +799,7 @@
         <thead>
           <tr>
             <th>Nome</th>
-            <th>Descrição</th>
+            <th>Segmento</th>
             <th>Grade</th>
             <th>Consumo (KG/pç)</th>
             <th>M.O. (R$/pç)</th>
@@ -1361,24 +1361,26 @@
       <div class="form-grid form-grid-2">
         <div class="form-group" style="grid-column:1/-1">
           <label>Nome do Modelo *</label>
-          <input type="text" id="modelo-nome" placeholder="Ex: Camiseta Básica">
+          <input type="text" id="modelo-nome" placeholder="Ex: Camiseta Básica, Calça Jeans 5 bolsos…">
         </div>
-        <div class="form-group" style="grid-column:1/-1">
+        <div class="form-group">
+          <label>Segmento *</label>
+          <select id="modelo-segmento" onchange="onSegmentoChange()">
+            <option value="malharia">🧵 Malharia</option>
+            <option value="jeans">👖 Jeans</option>
+            <option value="sarja">🪡 Sarja</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Descrição</label>
-          <textarea id="modelo-descricao" placeholder="Detalhes do modelo…"></textarea>
+          <input type="text" id="modelo-descricao" placeholder="Detalhes do modelo…">
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Grade (tamanhos disponíveis)</label>
-          <div class="grade-checks">
-            <label class="grade-check-label"><input type="checkbox" value="U" class="grade-check"> U (Único)</label>
-            <label class="grade-check-label"><input type="checkbox" value="P" class="grade-check"> P</label>
-            <label class="grade-check-label"><input type="checkbox" value="M" class="grade-check"> M</label>
-            <label class="grade-check-label"><input type="checkbox" value="G" class="grade-check"> G</label>
-            <label class="grade-check-label"><input type="checkbox" value="GG" class="grade-check"> GG</label>
-          </div>
+          <div class="grade-checks" id="grade-checks-container"></div>
         </div>
         <div class="form-group" style="grid-column:1/-1">
-          <label>Consumo de Malha (KG/peça) por tamanho</label>
+          <label>Consumo de Tecido (KG/peça) por tamanho</label>
           <table class="size-table" id="modelo-consumo-table">
             <thead><tr><th>Tamanho</th><th>Consumo KG</th><th>M.O. (R$)</th></tr></thead>
             <tbody id="modelo-size-rows"></tbody>
@@ -1424,7 +1426,7 @@
             <option value="">Selecione a oficina…</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="grupo-modelos-rolo">
           <label>Modelos por Rolo</label>
           <select id="ordem-modelos-rolo">
             <option value="1">1 modelo / rolo</option>
@@ -1538,6 +1540,68 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-pagamento')">Cancelar</button>
       <button class="btn btn-primary" onclick="savePagamento()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Lavanderia -->
+<div class="modal-overlay" id="modal-lavanderia">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <h2 id="modal-lav-title">🧺 Lavanderia</h2>
+      <button class="modal-close" onclick="closeModal('modal-lavanderia')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="lav-ordem-id">
+      <div id="lav-info-bar" style="background:#faf5ff;border-left:4px solid #7c3aed;border-radius:8px;padding:10px 14px;margin-bottom:18px;font-size:.88rem;color:#4c1d95;font-weight:600"></div>
+
+      <!-- Form novo registro -->
+      <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:18px">
+        <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:12px">Novo Registro</div>
+        <input type="hidden" id="lav-reg-id">
+        <div class="form-grid form-grid-2" style="gap:10px">
+          <div class="form-group">
+            <label>Data *</label>
+            <input type="date" id="lav-data">
+          </div>
+          <div class="form-group">
+            <label>Tipo *</label>
+            <select id="lav-tipo">
+              <option value="envio">📤 Envio para Lavanderia</option>
+              <option value="retorno">📥 Retorno da Lavanderia</option>
+            </select>
+          </div>
+          <div class="form-group" id="lav-grupo-lavagem">
+            <label id="lav-label-lavagem">Tipo de Lavagem *</label>
+            <select id="lav-lavagem-select">
+              <option value="">Selecione…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Lavagem personalizada</label>
+            <input type="text" id="lav-lavagem-custom" placeholder="Ou digite aqui…">
+          </div>
+          <div class="form-group">
+            <label>Qtd Enviada *</label>
+            <input type="number" id="lav-qtd-envio" min="0" placeholder="Ex: 150">
+          </div>
+          <div class="form-group" id="lav-grupo-retorno" style="display:none">
+            <label>Qtd Retornada *</label>
+            <input type="number" id="lav-qtd-retorno" min="0" placeholder="Ex: 148">
+          </div>
+          <div class="form-group" style="grid-column:1/-1">
+            <label>Observação</label>
+            <input type="text" id="lav-obs" placeholder="Ex: 2 peças manchadas, reprovadas…">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-primary" onclick="saveLavanderia()" id="btn-salvar-lav" style="background:#7c3aed;border-color:#7c3aed">💾 Salvar Registro</button>
+          <button class="btn btn-secondary" onclick="cancelEditLavanderia()" id="btn-cancelar-lav" style="display:none">Cancelar</button>
+        </div>
+      </div>
+
+      <!-- Lista de registros -->
+      <div id="lav-lista"></div>
     </div>
   </div>
 </div>
@@ -1779,8 +1843,14 @@ async function initFirebase() {
 /* ============================================================
    DATA & PERSISTENCE
 ============================================================ */
-const SIZES = ['U','P','M','G','GG'];
-const SIZE_LABELS = { U:'U (Único)', P:'P', M:'M', G:'G', GG:'GG' };
+const SIZES_MALHARIA = ['U','P','M','G','GG'];
+const SIZES_JEANS    = ['36','38','40','42','44','46','48'];
+const SIZES = SIZES_MALHARIA; // fallback legado
+const SIZE_LABELS = { U:'U', P:'P', M:'M', G:'G', GG:'GG',
+  '36':'36','38':'38','40':'40','42':'42','44':'44','46':'46','48':'48' };
+const SEGMENTO_LABELS = { malharia:'🧵 Malharia', jeans:'👖 Jeans', sarja:'🪡 Sarja' };
+const LAVAGENS_JEANS  = ['Escura','Clara','Média','Stone','Stonewash','Estonada','Destroyed','Delavê','Branca','Rústica'];
+const CORES_SARJA     = ['Preto','Marinho','Azul Royal','Verde','Vinho','Cinza','Bege','Mostarda','Caramelo'];
 
 function load(key) {
   try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; }
@@ -2748,9 +2818,12 @@ function renderModelos() {
     const grades = (m.grade||[]).join(', ');
     const consumoStr = (m.grade||[]).map(s => `${s}: ${(m.consumo_kg[s]||0)} kg`).join(' · ');
     const moStr      = (m.grade||[]).map(s => `${s}: ${fmtCurrency(m.valor_mo[s]||0)}`).join(' · ');
+    const seg = m.segmento || 'malharia';
+    const segColor = seg==='jeans'?'#dbeafe':seg==='sarja'?'#dcfce7':'#f0f9ff';
+    const segText  = seg==='jeans'?'#1d4ed8':seg==='sarja'?'#15803d':'#0369a1';
     return `<tr>
       <td class="font-bold">${m.nome}</td>
-      <td style="max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">${m.descricao||'—'}</td>
+      <td><span style="background:${segColor};color:${segText};padding:2px 10px;border-radius:6px;font-size:.8rem;font-weight:700">${SEGMENTO_LABELS[seg]||seg}</span></td>
       <td><span style="background:#f0f9ff; color:#0369a1; padding:2px 8px; border-radius:6px; font-size:.8rem; font-weight:700">${grades}</span></td>
       <td style="font-size:.8rem">${consumoStr}</td>
       <td style="font-size:.8rem">${moStr}</td>
@@ -2762,58 +2835,82 @@ function renderModelos() {
   }).join('');
 }
 
+function getSizesForSegmento(seg) {
+  return (seg === 'jeans' || seg === 'sarja') ? SIZES_JEANS : SIZES_MALHARIA;
+}
+
+function renderGradeChecks(seg, gradeAtual) {
+  const sizes = getSizesForSegmento(seg);
+  const cont = document.getElementById('grade-checks-container');
+  cont.innerHTML = sizes.map(s =>
+    `<label class="grade-check-label">
+       <input type="checkbox" value="${s}" class="grade-check" ${(gradeAtual||[]).includes(s)?'checked':''}
+         onchange="onGradeCheckChange()"> ${SIZE_LABELS[s]||s}
+     </label>`
+  ).join('');
+}
+
+function onSegmentoChange() {
+  const seg = document.getElementById('modelo-segmento').value;
+  renderGradeChecks(seg, []);
+  renderSizeRows([], {}, {}, seg);
+}
+
+function onGradeCheckChange() {
+  const seg    = document.getElementById('modelo-segmento').value;
+  const grade  = [...document.querySelectorAll('.grade-check:checked')].map(c => c.value);
+  const sizes  = getSizesForSegmento(seg);
+  const consumo = {}, mo = {};
+  sizes.forEach(s => {
+    consumo[s] = parseFloat(document.getElementById('consumo-'+s)?.value) || 0;
+    mo[s]      = parseFloat(document.getElementById('mo-'+s)?.value) || 0;
+  });
+  renderSizeRows(grade, consumo, mo, seg);
+}
+
 function openModeloModal(id) {
   const form = document.getElementById('modal-modelo');
   document.getElementById('modelo-id').value = '';
   document.getElementById('modelo-nome').value = '';
   document.getElementById('modelo-descricao').value = '';
-  document.querySelectorAll('.grade-check').forEach(cb => cb.checked = false);
+  document.getElementById('modelo-segmento').value = 'malharia';
   document.getElementById('modal-modelo-title').textContent = 'Novo Modelo';
-  renderSizeRows([], {}, {});
+  renderGradeChecks('malharia', []);
+  renderSizeRows([], {}, {}, 'malharia');
   if (id) {
     const m = getModelo(id);
     if (!m) return;
+    const seg = m.segmento || 'malharia';
     document.getElementById('modal-modelo-title').textContent = 'Editar Modelo';
     document.getElementById('modelo-id').value = m.id;
     document.getElementById('modelo-nome').value = m.nome;
     document.getElementById('modelo-descricao').value = m.descricao || '';
-    document.querySelectorAll('.grade-check').forEach(cb => {
-      cb.checked = (m.grade||[]).includes(cb.value);
-    });
-    renderSizeRows(m.grade || [], m.consumo_kg || {}, m.valor_mo || {});
+    document.getElementById('modelo-segmento').value = seg;
+    renderGradeChecks(seg, m.grade || []);
+    renderSizeRows(m.grade || [], m.consumo_kg || {}, m.valor_mo || {}, seg);
   }
   form.classList.add('open');
 }
 
-function renderSizeRows(grade, consumo, mo) {
+function renderSizeRows(grade, consumo, mo, seg) {
+  const sizes = getSizesForSegmento(seg || 'malharia');
   const tbody = document.getElementById('modelo-size-rows');
-  tbody.innerHTML = SIZES.map(s => {
+  tbody.innerHTML = sizes.map(s => {
     const active = grade.includes(s);
     return `<tr style="${active ? '' : 'opacity:.38'}">
-      <td><b>${s}</b></td>
+      <td><b>${SIZE_LABELS[s]||s}</b></td>
       <td><input type="number" id="consumo-${s}" step="0.001" min="0" value="${active ? (consumo[s]||'') : ''}" ${active?'':'disabled'} placeholder="0.000"></td>
       <td><input type="number" id="mo-${s}" step="0.01" min="0" value="${active ? (mo[s]||'') : ''}" ${active?'':'disabled'} placeholder="0,00"></td>
     </tr>`;
   }).join('');
 }
 
-document.querySelectorAll('.grade-check').forEach(cb => {
-  cb.addEventListener('change', () => {
-    const grade = [...document.querySelectorAll('.grade-check:checked')].map(c => c.value);
-    const consumo = {}, mo = {};
-    SIZES.forEach(s => {
-      consumo[s] = parseFloat(document.getElementById('consumo-'+s)?.value) || 0;
-      mo[s]      = parseFloat(document.getElementById('mo-'+s)?.value) || 0;
-    });
-    renderSizeRows(grade, consumo, mo);
-  });
-});
-
 function editModelo(id) { openModeloModal(id); }
 
 function saveModelo() {
-  const id   = document.getElementById('modelo-id').value;
-  const nome = document.getElementById('modelo-nome').value.trim();
+  const id      = document.getElementById('modelo-id').value;
+  const nome    = document.getElementById('modelo-nome').value.trim();
+  const segmento = document.getElementById('modelo-segmento').value || 'malharia';
   if (!nome) { alert('Informe o nome do modelo.'); return; }
   const grade = [...document.querySelectorAll('.grade-check:checked')].map(c => c.value);
   if (!grade.length) { alert('Selecione ao menos um tamanho na grade.'); return; }
@@ -2824,9 +2921,9 @@ function saveModelo() {
   });
   if (id) {
     const idx = modelos.findIndex(m => m.id === id);
-    modelos[idx] = { ...modelos[idx], nome, descricao: document.getElementById('modelo-descricao').value.trim(), grade, consumo_kg, valor_mo };
+    modelos[idx] = { ...modelos[idx], nome, segmento, descricao: document.getElementById('modelo-descricao').value.trim(), grade, consumo_kg, valor_mo };
   } else {
-    modelos.push({ id: uid(), nome, descricao: document.getElementById('modelo-descricao').value.trim(), grade, consumo_kg, valor_mo });
+    modelos.push({ id: uid(), nome, segmento, descricao: document.getElementById('modelo-descricao').value.trim(), grade, consumo_kg, valor_mo });
   }
   registrarAuditoria(id ? 'editar' : 'criar', 'modelo', `${id ? 'Editou' : 'Criou'} modelo "${nome}"`);
   save('oc_modelos', modelos);
@@ -2912,16 +3009,27 @@ function renderOrdens() {
       cortadoCell = `<div style="display:flex;flex-direction:column;gap:4px">${partes.join('')}</div>`;
     }
 
+    const segmento = m?.segmento || 'malharia';
+    const temLav   = (o.lavanderia_registros||[]).length > 0;
+    const segBadge = segmento !== 'malharia'
+      ? `<span style="background:${segmento==='jeans'?'#dbeafe':'#f0fdf4'};color:${segmento==='jeans'?'#1d4ed8':'#15803d'};padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:700;white-space:nowrap">${SEGMENTO_LABELS[segmento]||segmento}</span>` : '';
     return `<tr>
       <td style="white-space:nowrap;padding:8px 10px">
-        <button onclick="openCorteModal('${o.id}')"
-          style="background:#2563eb;color:#fff;border:none;white-space:nowrap;font-weight:700;padding:8px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">
-          ✂️📦 Acompanhar
-        </button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button onclick="openCorteModal('${o.id}')"
+            style="background:#2563eb;color:#fff;border:none;white-space:nowrap;font-weight:700;padding:8px 14px;border-radius:8px;font-size:.82rem;cursor:pointer">
+            ✂️📦 Acompanhar
+          </button>
+          ${(segmento==='jeans'||segmento==='sarja') && usuarioLogado?.role!=='oficina' ? `
+          <button onclick="openLavanderiaModal('${o.id}')"
+            style="background:${temLav?'#7c3aed':'#f1f5f9'};color:${temLav?'#fff':'#64748b'};border:none;white-space:nowrap;font-weight:700;padding:8px 12px;border-radius:8px;font-size:.82rem;cursor:pointer;border:1.5px solid ${temLav?'#7c3aed':'#e2e8f0'}">
+            🧺${temLav?' Lav.':''}
+          </button>` : ''}
+        </div>
       </td>
       <td class="text-mono font-bold" style="color:#2563eb">${o.numero}</td>
       <td style="white-space:nowrap">${fmtDate(o.data)}</td>
-      <td style="font-weight:600">${m ? m.nome : '<span class="text-muted">—</span>'}</td>
+      <td style="font-weight:600">${m ? m.nome : '<span class="text-muted">—</span>'}${segBadge ? ' '+segBadge : ''}</td>
       <td>${o.oficina}</td>
       <td>${badgeOrdem(o.status)}</td>
       <td style="white-space:nowrap">${fmtDate(o.previsao_entrega)}</td>
@@ -3088,6 +3196,11 @@ function toggleRoloEstoque(roloId, cor, kg, metros, nro_rolo, entrada_id) {
 
 function onModeloChange() {
   const mid = document.getElementById('ordem-modelo').value;
+  const m   = getModelo(mid);
+  const seg = m?.segmento || 'malharia';
+  // Esconde "Modelos por Rolo" para jeans/sarja (não usa rolos)
+  const grpRolo = document.getElementById('grupo-modelos-rolo');
+  if (grpRolo) grpRolo.style.display = (seg==='jeans'||seg==='sarja') ? 'none' : '';
   renderOrdemQtdRows(mid, {});
   updateOrdemCalc();
 }
@@ -5144,6 +5257,219 @@ function confirmarImportacaoRomaneio() {
 
   const totalRolos = cores.reduce((s, c) => s + c.rolos.length, 0);
   alert(`✅ Romaneio NF ${nf} importado com sucesso!\n${cores.length} cores · ${totalRolos} rolos adicionados ao estoque.`);
+}
+
+/* ============================================================
+   LAVANDERIA
+============================================================ */
+function openLavanderiaModal(ordemId) {
+  const o = getOrdem(ordemId);
+  if (!o) return;
+  const m   = getModelo(o.modelo_id);
+  const seg = m?.segmento || 'jeans';
+
+  document.getElementById('lav-ordem-id').value = ordemId;
+  document.getElementById('lav-reg-id').value   = '';
+  document.getElementById('lav-data').value      = new Date().toISOString().slice(0,10);
+  document.getElementById('lav-tipo').value      = 'envio';
+  document.getElementById('lav-lavagem-custom').value = '';
+  document.getElementById('lav-qtd-envio').value  = '';
+  document.getElementById('lav-qtd-retorno').value = '';
+  document.getElementById('lav-obs').value        = '';
+  document.getElementById('btn-cancelar-lav').style.display = 'none';
+  document.getElementById('btn-salvar-lav').textContent = '💾 Salvar Registro';
+
+  // Info bar
+  document.getElementById('lav-info-bar').innerHTML =
+    `Ordem <strong>${o.numero}</strong> · ${m?.nome||'—'} · <strong>${SEGMENTO_LABELS[seg]||seg}</strong>`;
+
+  // Label e opções de lavagem/tingimento
+  const lbl    = document.getElementById('lav-label-lavagem');
+  const selLav = document.getElementById('lav-lavagem-select');
+  if (seg === 'jeans') {
+    lbl.textContent = 'Tipo de Lavagem';
+    selLav.innerHTML = '<option value="">Selecione…</option>' +
+      LAVAGENS_JEANS.map(l => `<option value="${l}">${l}</option>`).join('');
+  } else {
+    lbl.textContent = 'Cor do Tingimento';
+    selLav.innerHTML = '<option value="">Selecione…</option>' +
+      CORES_SARJA.map(c => `<option value="${c}">${c}</option>`).join('');
+  }
+
+  // Mostrar/ocultar qtd retorno ao trocar tipo
+  document.getElementById('lav-tipo').onchange = () => {
+    const isRet = document.getElementById('lav-tipo').value === 'retorno';
+    document.getElementById('lav-grupo-retorno').style.display = isRet ? '' : 'none';
+  };
+
+  document.getElementById('modal-lav-title').textContent =
+    seg === 'jeans' ? '🧺 Lavanderia — Jeans' : '🧺 Lavanderia — Sarja';
+
+  renderLavanderiaLista(o, seg);
+  document.getElementById('modal-lavanderia').classList.add('open');
+}
+
+function renderLavanderiaLista(o, seg) {
+  const lista = document.getElementById('lav-lista');
+  const regs  = (o.lavanderia_registros || []).slice().reverse();
+  if (!regs.length) {
+    lista.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:18px;font-size:.88rem">Nenhum registro ainda.</div>';
+    return;
+  }
+  const canEdit = usuarioLogado?.role !== 'oficina';
+  lista.innerHTML = `
+    <div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">Registros</div>
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead>
+        <tr style="background:#f8fafc">
+          <th style="padding:7px 10px;border:1px solid #e2e8f0;text-align:left">Data</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">Tipo</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">${seg==='jeans'?'Lavagem':'Tingimento'}</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">Enviado</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">Retornado</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">Perda</th>
+          <th style="padding:7px 10px;border:1px solid #e2e8f0">Obs</th>
+          ${canEdit?'<th style="padding:7px 10px;border:1px solid #e2e8f0"></th>':''}
+        </tr>
+      </thead>
+      <tbody>
+        ${regs.map(r => {
+          const isRet  = r.tipo === 'retorno';
+          const perda  = isRet ? (r.qtd_envio||0) - (r.qtd_retorno||0) : '—';
+          const tipoLabel = isRet
+            ? '<span style="color:#16a34a;font-weight:700">📥 Retorno</span>'
+            : '<span style="color:#d97706;font-weight:700">📤 Envio</span>';
+          return `<tr>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;white-space:nowrap">${fmtDate(r.data)}</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center">${tipoLabel}</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:600">${r.lavagem||'—'}</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#d97706">${r.qtd_envio||'—'} pç</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:#16a34a">${isRet?(r.qtd_retorno||0)+' pç':'—'}</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${typeof perda==='number'&&perda>0?'#dc2626':'#94a3b8'}">${typeof perda==='number'?perda+' pç':perda}</td>
+            <td style="padding:7px 10px;border:1px solid #e2e8f0;font-size:.8rem;color:#64748b">${r.obs||'—'}</td>
+            ${canEdit?`<td style="padding:7px 10px;border:1px solid #e2e8f0">
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-secondary btn-sm" onclick="editLavanderia('${r.id}')">✏️</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteLavanderia('${r.id}')">✕</button>
+              </div>
+            </td>`:''}
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function saveLavanderia() {
+  const ordemId = document.getElementById('lav-ordem-id').value;
+  const o = getOrdem(ordemId);
+  if (!o) return;
+  const m   = getModelo(o.modelo_id);
+  const seg = m?.segmento || 'jeans';
+
+  const data      = document.getElementById('lav-data').value;
+  const tipo      = document.getElementById('lav-tipo').value;
+  const lavSel    = document.getElementById('lav-lavagem-select').value;
+  const lavCustom = document.getElementById('lav-lavagem-custom').value.trim();
+  const lavagem   = lavCustom || lavSel;
+  const qtd_envio   = parseInt(document.getElementById('lav-qtd-envio').value) || 0;
+  const qtd_retorno = tipo === 'retorno' ? (parseInt(document.getElementById('lav-qtd-retorno').value)||0) : 0;
+  const obs         = document.getElementById('lav-obs').value.trim();
+
+  if (!data)    { alert('Informe a data.'); return; }
+  if (!lavagem) { alert('Informe o tipo de lavagem / cor.'); return; }
+  if (!qtd_envio) { alert('Informe a quantidade enviada.'); return; }
+
+  const editId = document.getElementById('lav-reg-id').value;
+  if (!o.lavanderia_registros) o.lavanderia_registros = [];
+
+  if (editId) {
+    const idx = o.lavanderia_registros.findIndex(r => r.id === editId);
+    if (idx >= 0) o.lavanderia_registros[idx] = { ...o.lavanderia_registros[idx], data, tipo, lavagem, qtd_envio, qtd_retorno, obs };
+  } else {
+    o.lavanderia_registros.push({ id: uid(), data, tipo, lavagem, qtd_envio, qtd_retorno, obs });
+  }
+
+  const idx = ordens.findIndex(x => x.id === ordemId);
+  if (idx >= 0) ordens[idx] = o;
+  save('oc_ordens', ordens);
+  registrarAuditoria(editId?'editar':'criar','lavanderia',`${editId?'Editou':'Registrou'} lavanderia (${tipo}) – ${lavagem} – ${qtd_envio}pç – Ordem ${o.numero}`);
+
+  // Reset form
+  document.getElementById('lav-reg-id').value = '';
+  document.getElementById('lav-data').value   = new Date().toISOString().slice(0,10);
+  document.getElementById('lav-tipo').value   = 'envio';
+  document.getElementById('lav-lavagem-select').value = '';
+  document.getElementById('lav-lavagem-custom').value = '';
+  document.getElementById('lav-qtd-envio').value  = '';
+  document.getElementById('lav-qtd-retorno').value = '';
+  document.getElementById('lav-obs').value = '';
+  document.getElementById('lav-grupo-retorno').style.display = 'none';
+  document.getElementById('btn-cancelar-lav').style.display = 'none';
+  document.getElementById('btn-salvar-lav').textContent = '💾 Salvar Registro';
+
+  renderLavanderiaLista(o, seg);
+  renderOrdens();
+}
+
+function editLavanderia(regId) {
+  const ordemId = document.getElementById('lav-ordem-id').value;
+  const o = getOrdem(ordemId);
+  const r = (o?.lavanderia_registros||[]).find(x => x.id === regId);
+  if (!r) return;
+  const m   = getModelo(o.modelo_id);
+  const seg = m?.segmento || 'jeans';
+
+  document.getElementById('lav-reg-id').value   = r.id;
+  document.getElementById('lav-data').value      = r.data;
+  document.getElementById('lav-tipo').value      = r.tipo;
+  document.getElementById('lav-qtd-envio').value  = r.qtd_envio||'';
+  document.getElementById('lav-qtd-retorno').value = r.qtd_retorno||'';
+  document.getElementById('lav-obs').value        = r.obs||'';
+  document.getElementById('lav-grupo-retorno').style.display = r.tipo==='retorno' ? '' : 'none';
+  document.getElementById('btn-cancelar-lav').style.display = '';
+  document.getElementById('btn-salvar-lav').textContent = '💾 Atualizar Registro';
+
+  // Preencher lavagem
+  const selLav = document.getElementById('lav-lavagem-select');
+  const knownList = seg==='jeans' ? LAVAGENS_JEANS : CORES_SARJA;
+  if (knownList.includes(r.lavagem)) {
+    selLav.value = r.lavagem;
+    document.getElementById('lav-lavagem-custom').value = '';
+  } else {
+    selLav.value = '';
+    document.getElementById('lav-lavagem-custom').value = r.lavagem||'';
+  }
+}
+
+function cancelEditLavanderia() {
+  document.getElementById('lav-reg-id').value = '';
+  document.getElementById('lav-qtd-envio').value  = '';
+  document.getElementById('lav-qtd-retorno').value = '';
+  document.getElementById('lav-obs').value = '';
+  document.getElementById('lav-lavagem-custom').value = '';
+  document.getElementById('lav-lavagem-select').value = '';
+  document.getElementById('lav-grupo-retorno').style.display = 'none';
+  document.getElementById('btn-cancelar-lav').style.display = 'none';
+  document.getElementById('btn-salvar-lav').textContent = '💾 Salvar Registro';
+}
+
+function deleteLavanderia(regId) {
+  const ordemId = document.getElementById('lav-ordem-id').value;
+  const o = getOrdem(ordemId);
+  if (!o) return;
+  const m   = getModelo(o.modelo_id);
+  const seg = m?.segmento || 'jeans';
+  const r = (o.lavanderia_registros||[]).find(x => x.id === regId);
+  if (!r) return;
+  confirmDelete(`Excluir registro de lavanderia (${r.lavagem} – ${r.qtd_envio} pç)?`, '', () => {
+    o.lavanderia_registros = (o.lavanderia_registros||[]).filter(x => x.id !== regId);
+    const idx = ordens.findIndex(x => x.id === ordemId);
+    if (idx >= 0) ordens[idx] = o;
+    save('oc_ordens', ordens);
+    registrarAuditoria('excluir','lavanderia',`Excluiu registro lavanderia – ${r.lavagem} – Ordem ${o.numero}`);
+    renderLavanderiaLista(o, seg);
+    renderOrdens();
+  });
 }
 </script>
 </body>
