@@ -804,6 +804,7 @@
             <th>Tipo</th>
             <th>Unidade</th>
             <th>Estoque</th>
+            <th>Custo Unit.</th>
             <th>Observação</th>
             <th>Ações</th>
           </tr>
@@ -1443,6 +1444,10 @@
           <label>Estoque Atual</label>
           <input type="number" id="aviamento-estoque" min="0" step="1" placeholder="0">
         </div>
+        <div class="form-group">
+          <label>Custo unitário (R$)</label>
+          <input type="number" id="aviamento-preco" min="0" step="0.01" placeholder="0.00">
+        </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Observação</label>
           <input type="text" id="aviamento-obs" placeholder="Cor, fornecedor, referência…">
@@ -1536,14 +1541,13 @@
           <label>Grade (tamanhos disponíveis)</label>
           <div class="grade-checks" id="grade-checks-container"></div>
         </div>
-        <div class="form-group" style="grid-column:1/-1">
-          <label id="modelo-consumo-label">Consumo por tamanho</label>
-          <div style="overflow-x:auto">
-            <table class="size-table" id="modelo-consumo-table" style="min-width:100%">
-              <tbody id="modelo-size-rows"></tbody>
-            </table>
-          </div>
-          <div class="text-muted" style="font-size:.78rem; margin-top:5px">Preencha apenas os tamanhos da grade selecionada.</div>
+        <div class="form-group">
+          <label id="modelo-consumo-label">Consumo por peça (kg)</label>
+          <input type="number" id="modelo-consumo-unit" step="0.001" min="0" placeholder="Ex: 1.25">
+        </div>
+        <div class="form-group">
+          <label>M.O. por peça (R$)</label>
+          <input type="number" id="modelo-mo-unit" step="0.01" min="0" placeholder="Ex: 3.50">
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <div class="form-section-title">🔩 Aviamentos necessários por peça</div>
@@ -2990,8 +2994,10 @@ function renderModelos() {
   }
   tbody.innerHTML = modelos.map(m => {
     const grades = (m.grade||[]).join(', ');
-    const consumoStr = (m.grade||[]).map(s => `${s}: ${(m.consumo_kg[s]||0)} kg`).join(' · ');
-    const moStr      = (m.grade||[]).map(s => `${s}: ${fmtCurrency(m.valor_mo[s]||0)}`).join(' · ');
+    const seg = m.segmento || 'malharia';
+    const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
+    const consumoStr = m.consumo_unit ? `${m.consumo_unit} ${unidade}/pç` : '—';
+    const moStr      = m.valor_mo_unit ? fmtCurrency(m.valor_mo_unit) + '/pç' : '—';
     const seg = m.segmento || 'malharia';
     const segColor = seg==='jeans'?'#dbeafe':seg==='sarja'?'#dcfce7':'#f0f9ff';
     const segText  = seg==='jeans'?'#1d4ed8':seg==='sarja'?'#15803d':'#0369a1';
@@ -3028,32 +3034,28 @@ function renderGradeChecks(seg, gradeAtual) {
 function onSegmentoChange() {
   const seg = document.getElementById('modelo-segmento').value;
   renderGradeChecks(seg, []);
-  renderSizeRows([], {}, {}, seg);
+  const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
+  const lbl = document.getElementById('modelo-consumo-label');
+  if (lbl) lbl.textContent = `Consumo por peça (${unidade})`;
   const grpLav = document.getElementById('modelo-lavagem-grupo');
   if (grpLav) grpLav.style.display = (seg === 'jeans' || seg === 'sarja') ? '' : 'none';
 }
 
 function onGradeCheckChange() {
-  const seg    = document.getElementById('modelo-segmento').value;
-  const grade  = [...document.querySelectorAll('.grade-check:checked')].map(c => c.value);
-  const sizes  = getSizesForSegmento(seg);
-  const consumo = {}, mo = {};
-  sizes.forEach(s => {
-    consumo[s] = parseFloat(document.getElementById('consumo-'+s)?.value) || 0;
-    mo[s]      = parseFloat(document.getElementById('mo-'+s)?.value) || 0;
-  });
-  renderSizeRows(grade, consumo, mo, seg);
+  // Grade apenas marca os tamanhos disponíveis — sem tabela de consumo individual
 }
 
 function openModeloModal(id) {
   const form = document.getElementById('modal-modelo');
-  document.getElementById('modelo-id').value = '';
-  document.getElementById('modelo-nome').value = '';
-  document.getElementById('modelo-descricao').value = '';
-  document.getElementById('modelo-segmento').value = 'malharia';
+  document.getElementById('modelo-id').value         = '';
+  document.getElementById('modelo-nome').value        = '';
+  document.getElementById('modelo-descricao').value   = '';
+  document.getElementById('modelo-segmento').value    = 'malharia';
+  document.getElementById('modelo-consumo-unit').value = '';
+  document.getElementById('modelo-mo-unit').value      = '';
+  document.getElementById('modelo-consumo-label').textContent = 'Consumo por peça (kg)';
   document.getElementById('modal-modelo-title').textContent = 'Novo Modelo';
   renderGradeChecks('malharia', []);
-  renderSizeRows([], {}, {}, 'malharia');
   renderAviamentosModelo([]);
   renderLavagensModelo([], 'malharia');
   const grpLav = document.getElementById('modelo-lavagem-grupo');
@@ -3061,14 +3063,17 @@ function openModeloModal(id) {
   if (id) {
     const m = getModelo(id);
     if (!m) return;
-    const seg = m.segmento || 'malharia';
-    document.getElementById('modal-modelo-title').textContent = 'Editar Modelo';
-    document.getElementById('modelo-id').value = m.id;
-    document.getElementById('modelo-nome').value = m.nome;
-    document.getElementById('modelo-descricao').value = m.descricao || '';
-    document.getElementById('modelo-segmento').value = seg;
+    const seg     = m.segmento || 'malharia';
+    const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
+    document.getElementById('modal-modelo-title').textContent  = 'Editar Modelo';
+    document.getElementById('modelo-id').value                  = m.id;
+    document.getElementById('modelo-nome').value                = m.nome;
+    document.getElementById('modelo-descricao').value           = m.descricao || '';
+    document.getElementById('modelo-segmento').value            = seg;
+    document.getElementById('modelo-consumo-unit').value        = m.consumo_unit || '';
+    document.getElementById('modelo-mo-unit').value             = m.valor_mo_unit || '';
+    document.getElementById('modelo-consumo-label').textContent = `Consumo por peça (${unidade})`;
     renderGradeChecks(seg, m.grade || []);
-    renderSizeRows(m.grade || [], m.consumo_kg || {}, m.valor_mo || {}, seg);
     renderAviamentosModelo(m.aviamentos_necessarios || []);
     renderLavagensModelo(m.lavagens_processo || [], seg);
     if (grpLav) grpLav.style.display = (seg === 'jeans' || seg === 'sarja') ? '' : 'none';
@@ -3076,55 +3081,7 @@ function openModeloModal(id) {
   form.classList.add('open');
 }
 
-function renderSizeRows(grade, consumo, mo, seg) {
-  const sizes   = getSizesForSegmento(seg || 'malharia');
-  const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
-  const tbody   = document.getElementById('modelo-size-rows');
-  const lbl     = document.getElementById('modelo-consumo-label');
-  if (lbl) lbl.textContent = `Consumo (${unidade}/peça) e M.O. por tamanho`;
-
-  const thStyle = 'padding:6px 8px;font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;border:1px solid #e2e8f0;text-align:center;background:#f8fafc;white-space:nowrap';
-  const tdStyle = 'padding:4px 5px;border:1px solid #e2e8f0;text-align:center';
-  const inpStyle= 'width:58px;text-align:center;padding:5px 2px;border:1.5px solid #e2e8f0;border-radius:6px;font-size:.85rem;font-weight:600';
-
-  const headerRow = `<tr>
-    <th style="${thStyle};text-align:left;min-width:90px"></th>
-    ${sizes.map(s => {
-      const active = grade.includes(s);
-      return `<th style="${thStyle};${active?'color:#1d4ed8;background:#eff6ff':''}">${SIZE_LABELS[s]||s}</th>`;
-    }).join('')}
-  </tr>`;
-
-  const consumoRow = `<tr>
-    <td style="${tdStyle};font-weight:700;text-align:left;font-size:.78rem;color:#374151;background:#fafafa">Consumo (${unidade})</td>
-    ${sizes.map(s => {
-      const active = grade.includes(s);
-      return `<td style="${tdStyle}">
-        <input type="number" id="consumo-${s}" step="0.001" min="0"
-          value="${active ? (consumo[s]||'') : ''}"
-          ${active?'':'disabled'}
-          style="${inpStyle};${active?'border-color:#c7d2fe':'opacity:.35'}"
-          placeholder="0.000">
-      </td>`;
-    }).join('')}
-  </tr>`;
-
-  const moRow = `<tr>
-    <td style="${tdStyle};font-weight:700;text-align:left;font-size:.78rem;color:#374151;background:#fafafa">M.O. (R$)</td>
-    ${sizes.map(s => {
-      const active = grade.includes(s);
-      return `<td style="${tdStyle}">
-        <input type="number" id="mo-${s}" step="0.01" min="0"
-          value="${active ? (mo[s]||'') : ''}"
-          ${active?'':'disabled'}
-          style="${inpStyle};${active?'border-color:#bbf7d0':'opacity:.35'}"
-          placeholder="0.00">
-      </td>`;
-    }).join('')}
-  </tr>`;
-
-  tbody.innerHTML = headerRow + consumoRow + moRow;
-}
+function renderSizeRows() {} // removido — consumo agora é campo único
 
 function editModelo(id) { openModeloModal(id); }
 
@@ -3135,19 +3092,16 @@ function saveModelo() {
   if (!nome) { alert('Informe o nome do modelo.'); return; }
   const grade = [...document.querySelectorAll('.grade-check:checked')].map(c => c.value);
   if (!grade.length) { alert('Selecione ao menos um tamanho na grade.'); return; }
-  const consumo_kg = {}, valor_mo = {};
-  grade.forEach(s => {
-    consumo_kg[s] = parseFloat(document.getElementById('consumo-'+s)?.value) || 0;
-    valor_mo[s]   = parseFloat(document.getElementById('mo-'+s)?.value) || 0;
-  });
+  const consumo_unit   = parseFloat(document.getElementById('modelo-consumo-unit').value) || 0;
+  const valor_mo_unit  = parseFloat(document.getElementById('modelo-mo-unit').value) || 0;
   const aviamentos_necessarios = getAviamentosModeloData();
   const lavagens_processo      = getLavagensModeloData();
   const descricao = document.getElementById('modelo-descricao').value.trim();
   if (id) {
     const idx = modelos.findIndex(m => m.id === id);
-    modelos[idx] = { ...modelos[idx], nome, segmento, descricao, grade, consumo_kg, valor_mo, aviamentos_necessarios, lavagens_processo };
+    modelos[idx] = { ...modelos[idx], nome, segmento, descricao, grade, consumo_unit, valor_mo_unit, aviamentos_necessarios, lavagens_processo };
   } else {
-    modelos.push({ id: uid(), nome, segmento, descricao, grade, consumo_kg, valor_mo, aviamentos_necessarios, lavagens_processo });
+    modelos.push({ id: uid(), nome, segmento, descricao, grade, consumo_unit, valor_mo_unit, aviamentos_necessarios, lavagens_processo });
   }
   registrarAuditoria(id ? 'editar' : 'criar', 'modelo', `${id ? 'Editou' : 'Criou'} modelo "${nome}"`);
   save('oc_modelos', modelos);
@@ -5713,6 +5667,7 @@ function renderAviamentos() {
     <td>${tipoLabel[a.tipo]||a.tipo}</td>
     <td>${a.unidade||'un'}</td>
     <td style="font-weight:700;color:#1d4ed8">${a.estoque_atual||0}</td>
+    <td style="font-weight:700;color:#16a34a">${a.preco_unit ? fmtCurrency(a.preco_unit) : '—'}</td>
     <td style="color:#64748b;font-size:.85rem">${a.obs||'—'}</td>
     <td><div class="actions-cell">
       <button class="btn btn-secondary btn-sm" onclick="editAviamento('${a.id}')">Editar</button>
@@ -5722,23 +5677,25 @@ function renderAviamentos() {
 }
 
 function openAviamentoModal(id) {
-  document.getElementById('aviamento-id').value   = '';
-  document.getElementById('aviamento-nome').value  = '';
-  document.getElementById('aviamento-tipo').value  = 'botao';
-  document.getElementById('aviamento-unidade').value = 'un';
-  document.getElementById('aviamento-estoque').value = '';
-  document.getElementById('aviamento-obs').value   = '';
+  document.getElementById('aviamento-id').value      = '';
+  document.getElementById('aviamento-nome').value     = '';
+  document.getElementById('aviamento-tipo').value     = 'botao';
+  document.getElementById('aviamento-unidade').value  = 'un';
+  document.getElementById('aviamento-estoque').value  = '';
+  document.getElementById('aviamento-preco').value    = '';
+  document.getElementById('aviamento-obs').value      = '';
   document.getElementById('modal-aviamento-title').textContent = 'Novo Aviamento';
   if (id) {
     const a = aviamentos.find(x => x.id === id);
     if (!a) return;
     document.getElementById('modal-aviamento-title').textContent = 'Editar Aviamento';
-    document.getElementById('aviamento-id').value   = a.id;
-    document.getElementById('aviamento-nome').value  = a.nome;
-    document.getElementById('aviamento-tipo').value  = a.tipo||'botao';
-    document.getElementById('aviamento-unidade').value = a.unidade||'un';
-    document.getElementById('aviamento-estoque').value = a.estoque_atual||'';
-    document.getElementById('aviamento-obs').value   = a.obs||'';
+    document.getElementById('aviamento-id').value      = a.id;
+    document.getElementById('aviamento-nome').value     = a.nome;
+    document.getElementById('aviamento-tipo').value     = a.tipo||'botao';
+    document.getElementById('aviamento-unidade').value  = a.unidade||'un';
+    document.getElementById('aviamento-estoque').value  = a.estoque_atual||'';
+    document.getElementById('aviamento-preco').value    = a.preco_unit||'';
+    document.getElementById('aviamento-obs').value      = a.obs||'';
   }
   document.getElementById('modal-aviamento').classList.add('open');
 }
@@ -5753,6 +5710,7 @@ function saveAviamento() {
     tipo:          document.getElementById('aviamento-tipo').value,
     unidade:       document.getElementById('aviamento-unidade').value,
     estoque_atual: parseInt(document.getElementById('aviamento-estoque').value)||0,
+    preco_unit:    parseFloat(document.getElementById('aviamento-preco').value)||0,
     obs:           document.getElementById('aviamento-obs').value.trim()
   };
   if (id) {
@@ -5840,13 +5798,17 @@ function _renderLavagensModeloUI(seg) {
   }
   cont.innerHTML = _lavagensModeloRows.map((row, i) => {
     const opts = opcoes.map(o => `<option value="${o}" ${o===row.nome?'selected':''}>${o}</option>`).join('');
-    return `<div style="display:flex;gap:8px;align-items:center;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px">
-      <select onchange="_lavagensModeloRows[${i}].nome=this.value" style="flex:2;padding:5px 8px;border:1.5px solid #bbf7d0;border-radius:6px;font-size:.85rem">
+    return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:8px 10px">
+      <select onchange="_lavagensModeloRows[${i}].nome=this.value" style="flex:2;min-width:110px;padding:5px 8px;border:1.5px solid #bbf7d0;border-radius:6px;font-size:.85rem">
         <option value="">Selecione…</option>${opts}
       </select>
       <input type="text" value="${row.nome_custom||''}" placeholder="Ou personalize…"
         onchange="_lavagensModeloRows[${i}].nome_custom=this.value"
-        style="flex:1;padding:5px 8px;border:1.5px solid #bbf7d0;border-radius:6px;font-size:.85rem">
+        style="flex:1;min-width:90px;padding:5px 8px;border:1.5px solid #bbf7d0;border-radius:6px;font-size:.85rem">
+      <div style="font-size:.75rem;font-weight:700;color:#64748b;white-space:nowrap">R$/peça</div>
+      <input type="number" min="0" step="0.01" value="${row.custo_por_peca||''}" placeholder="0.00"
+        onchange="_lavagensModeloRows[${i}].custo_por_peca=parseFloat(this.value)||0"
+        style="width:72px;padding:5px 8px;border:1.5px solid #bbf7d0;border-radius:6px;font-size:.85rem;text-align:right">
       <button type="button" onclick="_lavagensModeloRows.splice(${i},1);_renderLavagensModeloUI()"
         style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:1.1rem;padding:2px 6px">✕</button>
     </div>`;
@@ -5854,12 +5816,14 @@ function _renderLavagensModeloUI(seg) {
 }
 
 function addLavagemModelo() {
-  _lavagensModeloRows.push({ nome: '', nome_custom: '' });
+  _lavagensModeloRows.push({ nome: '', nome_custom: '', custo_por_peca: 0 });
   _renderLavagensModeloUI();
 }
 
 function getLavagensModeloData() {
-  return _lavagensModeloRows.map(r => ({ nome: r.nome_custom || r.nome })).filter(r => r.nome);
+  return _lavagensModeloRows
+    .map(r => ({ nome: r.nome_custom || r.nome, custo_por_peca: r.custo_por_peca || 0 }))
+    .filter(r => r.nome);
 }
 
 /* ============================================================
@@ -5951,73 +5915,115 @@ function openFichaTecnica(modeloId) {
   const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
   const segLbl  = SEGMENTO_LABELS[seg] || seg;
 
-  const thS = 'padding:7px 10px;font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;border:1px solid #e2e8f0;text-align:center;background:#f8fafc';
-  const tdS = 'padding:7px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:600';
+  const thS = 'padding:7px 12px;font-size:.75rem;font-weight:700;text-transform:uppercase;color:#64748b;border:1px solid #e2e8f0;background:#f8fafc';
+  const tdS = 'padding:8px 12px;border:1px solid #e2e8f0;font-weight:600';
+  const tdR = tdS + ';text-align:right';
 
-  // Tabela consumo
-  const grade = m.grade || [];
-  const consumoTable = grade.length ? `
-    <table style="width:100%;border-collapse:collapse;font-size:.85rem;margin-bottom:4px">
-      <thead><tr>
-        <th style="${thS};text-align:left">Tamanho</th>
-        ${grade.map(s=>`<th style="${thS}">${SIZE_LABELS[s]||s}</th>`).join('')}
-      </tr></thead>
-      <tbody>
-        <tr>
-          <td style="${tdS};text-align:left;background:#fafafa;font-size:.78rem">Consumo (${unidade})</td>
-          ${grade.map(s=>`<td style="${tdS}">${(m.consumo_kg||{})[s]||'—'}</td>`).join('')}
-        </tr>
-        <tr>
-          <td style="${tdS};text-align:left;background:#fafafa;font-size:.78rem">M.O. (R$)</td>
-          ${grade.map(s=>`<td style="${tdS}">${fmtCurrency((m.valor_mo||{})[s]||0)}</td>`).join('')}
-        </tr>
-      </tbody>
-    </table>` : '<div style="color:#94a3b8;font-size:.85rem">Grade não definida.</div>';
+  // Grade
+  const grade = (m.grade||[]).join(' · ') || '—';
 
-  // Aviamentos
+  // Consumo e MO únicos
+  const consumoBlock = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:4px">
+      <div style="background:#eff6ff;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">Consumo por peça</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1d4ed8">${m.consumo_unit ? m.consumo_unit + ' ' + unidade : '—'}</div>
+      </div>
+      <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px">M.O. por peça</div>
+        <div style="font-size:1.3rem;font-weight:800;color:#16a34a">${m.valor_mo_unit ? fmtCurrency(m.valor_mo_unit) : '—'}</div>
+      </div>
+    </div>`;
+
+  // Aviamentos com custo
   const avs = (m.aviamentos_necessarios||[]);
+  let totalAviamentos = 0;
   const aviBlock = avs.length ? `
     <table style="width:100%;border-collapse:collapse;font-size:.85rem">
       <thead><tr>
         <th style="${thS};text-align:left">Aviamento</th>
-        <th style="${thS}">Unidade</th>
-        <th style="${thS}">Qtd/peça</th>
+        <th style="${thS};text-align:center">Un.</th>
+        <th style="${thS};text-align:center">Qtd/pç</th>
+        <th style="${thS};text-align:right">Custo unit.</th>
+        <th style="${thS};text-align:right">Custo/pç</th>
       </tr></thead>
       <tbody>
         ${avs.map(a => {
-          const av = aviamentos.find(x => x.id === a.aviamento_id);
+          const av  = aviamentos.find(x => x.id === a.aviamento_id);
+          const qtd = a.qtd || 1;
+          const preco = av?.preco_unit || 0;
+          const subtotal = qtd * preco;
+          totalAviamentos += subtotal;
           return `<tr>
-            <td style="${tdS};text-align:left">${av?.nome||'—'}</td>
-            <td style="${tdS}">${av?.unidade||'un'}</td>
-            <td style="${tdS};font-weight:700;color:#1d4ed8">${a.qtd||1}</td>
+            <td style="${tdS}">${av?.nome||'—'}</td>
+            <td style="${tdS};text-align:center">${av?.unidade||'un'}</td>
+            <td style="${tdS};text-align:center;color:#1d4ed8;font-weight:700">${qtd}</td>
+            <td style="${tdR}">${preco ? fmtCurrency(preco) : '—'}</td>
+            <td style="${tdR};color:${subtotal?'#d97706':'#94a3b8'};font-weight:700">${subtotal ? fmtCurrency(subtotal) : '—'}</td>
           </tr>`;
         }).join('')}
+        <tr style="background:#fffbeb">
+          <td colspan="4" style="${tdS};text-align:right;font-size:.78rem;color:#64748b">Total aviamentos/peça</td>
+          <td style="${tdR};font-weight:800;color:#d97706;font-size:.95rem">${totalAviamentos ? fmtCurrency(totalAviamentos) : '—'}</td>
+        </tr>
       </tbody>
     </table>` : '<div style="color:#94a3b8;font-size:.85rem">Nenhum aviamento definido.</div>';
 
-  // Lavagens
+  // Lavagens com custo
   const lavs = (m.lavagens_processo||[]);
-  const lavBlock = lavs.length
-    ? lavs.map(l=>`<span style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:4px 12px;border-radius:20px;font-size:.85rem;font-weight:600">${l.nome}</span>`).join(' ')
-    : '<span style="color:#94a3b8;font-size:.85rem">Nenhuma lavagem definida.</span>';
+  let totalLavagens = 0;
+  const lavBlock = lavs.length ? `
+    <table style="width:100%;border-collapse:collapse;font-size:.85rem">
+      <thead><tr>
+        <th style="${thS};text-align:left">Lavagem / Cor</th>
+        <th style="${thS};text-align:right">Custo/peça</th>
+      </tr></thead>
+      <tbody>
+        ${lavs.map(l => {
+          totalLavagens += l.custo_por_peca || 0;
+          return `<tr>
+            <td style="${tdS}">
+              <span style="background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:3px 10px;border-radius:20px;font-size:.83rem;font-weight:600">${l.nome}</span>
+            </td>
+            <td style="${tdR};font-weight:700;color:${l.custo_por_peca?'#7c3aed':'#94a3b8'}">${l.custo_por_peca ? fmtCurrency(l.custo_por_peca) : '—'}</td>
+          </tr>`;
+        }).join('')}
+        <tr style="background:#faf5ff">
+          <td style="${tdS};text-align:right;font-size:.78rem;color:#64748b">Total lavanderia/peça</td>
+          <td style="${tdR};font-weight:800;color:#7c3aed;font-size:.95rem">${totalLavagens ? fmtCurrency(totalLavagens) : '—'}</td>
+        </tr>
+      </tbody>
+    </table>` : '<span style="color:#94a3b8;font-size:.85rem">Nenhuma lavagem definida.</span>';
+
+  // Total geral por peça
+  const moUnit = m.valor_mo_unit || 0;
+  const totalGeral = moUnit + totalAviamentos + totalLavagens;
+  const totalBlock = totalGeral ? `
+    <div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:12px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <div style="color:#94a3b8;font-size:.82rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Custo total por peça (excl. tecido)</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#fff">${fmtCurrency(totalGeral)}</div>
+    </div>` : '';
 
   const body = `
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
       <span style="font-size:1.1rem;font-weight:700">${m.nome}</span>
       <span style="background:${seg==='jeans'?'#dbeafe':seg==='sarja'?'#dcfce7':'#f0f9ff'};color:${seg==='jeans'?'#1d4ed8':seg==='sarja'?'#15803d':'#0369a1'};padding:3px 12px;border-radius:20px;font-size:.8rem;font-weight:700">${segLbl}</span>
+      <span style="color:#64748b;font-size:.85rem">Grade: <strong>${grade}</strong></span>
     </div>
-    ${m.descricao ? `<div style="color:#64748b;font-size:.88rem;margin-bottom:18px">${m.descricao}</div>` : ''}
+    ${m.descricao ? `<div style="color:#64748b;font-size:.85rem;margin-bottom:14px">${m.descricao}</div>` : ''}
 
-    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">📐 Grade & Consumo</div>
-    ${consumoTable}
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px">📐 Consumo & M.O.</div>
+    ${consumoBlock}
 
-    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin:18px 0 8px">🔩 Aviamentos por Peça</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin:18px 0 8px">🔩 Aviamentos por Peça</div>
     ${aviBlock}
 
     ${(seg==='jeans'||seg==='sarja') ? `
-    <div style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin:18px 0 8px">🧺 Processo de Lavanderia</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">${lavBlock}</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin:18px 0 8px">🧺 Processo de Lavanderia</div>
+    ${lavBlock}
     ` : ''}
+
+    <div style="margin-top:18px">${totalBlock}</div>
   `;
 
   document.getElementById('modal-ficha-title').textContent = `📋 Ficha — ${m.nome}`;
