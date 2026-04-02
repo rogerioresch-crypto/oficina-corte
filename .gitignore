@@ -1,0 +1,15 @@
+# Local Netlify folder
+.netlify
+
+# Sensitive credentials — NEVER commit
+backend/.env
+backend/credentials.json
+
+# Claude internal
+.claude/
+
+# Node / Python
+node_modules/
+__pycache__/
+*.pyc
+.env
