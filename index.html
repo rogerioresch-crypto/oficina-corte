@@ -2004,16 +2004,27 @@ function _recarregarTodosOsDados() {
 
 function initFirebase() {
   // 1. Carrega localStorage e abre o app IMEDIATAMENTE
-  _recarregarTodosOsDados();
-  document.getElementById('fb-loading').style.display = 'none';
+  try { _recarregarTodosOsDados(); } catch(e) {}
+  try { document.getElementById('fb-loading').style.display = 'none'; } catch(e) {}
   usuarioLogado = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
-  try { aplicarPermissoes(); } catch(e) { console.error('aplicarPermissoes:', e); }
+
+  // Garante dashboard visível
   try {
-    renderDashboard();
-  } catch(e) {
+    document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
+    document.getElementById('page-dashboard').classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach(function(t){ t.classList.remove('active'); });
+    var bt = document.querySelector('[data-page="dashboard"]');
+    if (bt) bt.classList.add('active');
+  } catch(e) {}
+
+  try { aplicarPermissoes(); } catch(e) { console.error('aplicarPermissoes:', e); }
+  try { renderDashboard(); } catch(e) {
     console.error('renderDashboard erro:', e);
-    const ds = document.getElementById('dash-summary');
-    if (ds) ds.innerHTML = '<div style="padding:20px;color:red">Erro ao carregar: ' + e.message + '</div>';
+    try {
+      document.getElementById('dash-summary').innerHTML =
+        '<div style="padding:20px;background:#fef2f2;border-radius:8px;color:#dc2626;font-family:sans-serif">'
+        + '<b>Erro:</b> ' + e.message + '</div>';
+    } catch(e2) {}
   }
 
   // 2. Firebase sync em background (não bloqueia nada)
