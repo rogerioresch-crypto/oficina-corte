@@ -671,7 +671,7 @@
 <body>
 <!-- Loading overlay enquanto sincroniza com Firebase -->
 <!-- Tela de Login -->
-<div id="login-screen" style="display:none!important;position:fixed;inset:0;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);z-index:10000;align-items:center;justify-content:center">
+<div id="login-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);z-index:10000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:20px;padding:40px 36px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25)">
     <div style="text-align:center;margin-bottom:28px">
       <div style="font-size:2.5rem;margin-bottom:8px">✂️</div>
@@ -2003,12 +2003,21 @@ function _recarregarTodosOsDados() {
 }
 
 function initFirebase() {
-  // 1. Carrega localStorage e abre o app IMEDIATAMENTE
+  // 1. Carrega localStorage imediatamente
   try { _recarregarTodosOsDados(); } catch(e) {}
+  // Garante admin padrão existe
+  try { seedAdminIfNeeded(); } catch(e) {}
   try { document.getElementById('fb-loading').style.display = 'none'; } catch(e) {}
-  usuarioLogado = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
 
-  // Garante dashboard visível
+  // 2. Verifica sessão salva
+  const temSessao = verificarSessao();
+  if (!temSessao) {
+    // Sem sessão → mostra tela de login
+    try { document.getElementById('login-screen').style.display = 'flex'; } catch(e) {}
+    return; // para aqui, login vai chamar aplicarPermissoes e renderDashboard
+  }
+
+  // 3. Sessão válida → entra direto
   try {
     document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active'); });
     document.getElementById('page-dashboard').classList.add('active');
@@ -5003,23 +5012,23 @@ function fazerLogin() {
   erroEl.style.display = 'none';
   if (!u || !s) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
 
-  // Admin padrão — sem depender de nada, direto
-  let userObj = null;
-  if (u === 'admin' && s === 'admin123') {
-    userObj = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
-  } else {
-    // Outros usuários — busca no localStorage com hash FNV
-    const hash = hashSenha(s);
-    let arr = [];
-    try { arr = JSON.parse(localStorage.getItem('oc_usuarios') || '[]'); } catch(e) {}
-    userObj = arr.find(x => x.usuario === u && x.senha_hash === hash && x.ativo !== false) || null;
-  }
+  // Busca usuário no localStorage com hash FNV
+  const hash = hashSenha(s);
+  let arr = [];
+  try { arr = JSON.parse(localStorage.getItem('oc_usuarios') || '[]'); } catch(e) {}
+  const userObj = arr.find(x => x.usuario === u && x.senha_hash === hash && x.ativo !== false) || null;
 
   if (!userObj) { erroEl.textContent = 'Usuário ou senha incorretos.'; erroEl.style.display = ''; return; }
 
   usuarioLogado = { id: userObj.id, nome: userObj.nome, usuario: userObj.usuario, role: userObj.role, oficina_id: userObj.oficina_id || '', oficina_nome: userObj.oficina_nome || '' };
   localStorage.setItem('oc_sessao', JSON.stringify({ ...usuarioLogado, timestamp: Date.now() }));
   document.getElementById('login-screen').style.display = 'none';
+  // Garante dashboard como página inicial antes de aplicar permissões
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-dashboard').classList.add('active');
+  var bt = document.querySelector('[data-page="dashboard"]');
+  if (bt) bt.classList.add('active');
   aplicarPermissoes();
   renderDashboard();
 }
@@ -5088,7 +5097,7 @@ function renderUsuarios() {
     <tr>
       <td><strong>${u.nome}</strong></td>
       <td style="font-family:monospace;font-size:.88rem">${u.usuario}</td>
-      <td><span style="background:${u.role==='admin'?'#fef3c7':'#e0f2fe'};color:${u.role==='admin'?'#92400e':'#0369a1'};padding:3px 9px;border-radius:20px;font-size:.78rem;font-weight:700">${u.role==='admin'?'👑 Admin':'👤 Operador'}</span></td>
+      <td><span style="background:${u.role==='admin'?'#fef3c7':u.role==='oficina'?'#f0fdf4':'#e0f2fe'};color:${u.role==='admin'?'#92400e':u.role==='oficina'?'#15803d':'#0369a1'};padding:3px 9px;border-radius:20px;font-size:.78rem;font-weight:700">${u.role==='admin'?'👑 Admin':u.role==='oficina'?`🏭 Oficina${u.oficina_nome?' ('+u.oficina_nome+')':''}` :'👤 Operador'}</span></td>
       <td><span style="color:${u.ativo!==false?'#16a34a':'#dc2626'};font-weight:600">${u.ativo!==false?'✅ Ativo':'❌ Inativo'}</span></td>
       <td>
         <button class="btn btn-secondary" style="padding:4px 10px;font-size:.78rem" onclick="openUsuarioModal('${u.id}')">✏️ Editar</button>
