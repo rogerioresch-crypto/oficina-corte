@@ -2891,7 +2891,9 @@ function enviarFichaWhatsApp() {
 
   ordensSelected.forEach(o => {
     const m = getModelo(o.modelo_id);
-    const grade = m ? m.grade : SIZES.filter(s => (o.quantidades||{})[s] > 0);
+    const seg = m ? (m.segmento || 'malharia') : 'malharia';
+    const sizesRef = (seg === 'jeans' || seg === 'sarja') ? SIZES_JEANS : SIZES_MALHARIA;
+    const grade = (m && m.grade && m.grade.length) ? m.grade : sizesRef.filter(s => (o.quantidades||{})[s] > 0);
     const totalPedido = sumQtd(o.quantidades||{});
     const mpr = o.modelos_por_rolo || 1;
     const mprLabel = mpr === 0.5 ? '½ modelo/rolo' : `${mpr} modelo(s)/rolo`;
@@ -2902,22 +2904,18 @@ function enviarFichaWhatsApp() {
     msg += `Previsão entrega: ${fmtDate(o.previsao_entrega)}\n`;
     msg += `Rolos: *${mprLabel}*\n`;
 
-    // Cores com quantidade por cor × tamanho
-    const numCores = (o.cores && o.cores.length) ? o.cores.length : 1;
+    // Sempre mostra grade com quantidades por tamanho
+    const gradeLine = grade.map(s => {
+      const q = (o.quantidades||{})[s] || 0;
+      return q > 0 ? `${SIZE_LABELS[s]||s}:${q}` : '';
+    }).filter(Boolean).join('  ');
+    if (gradeLine) msg += `📐 Grade: ${gradeLine}\n`;
+
+    // Cores (se definidas)
     if (o.cores && o.cores.length) {
+      const tecLabel = tec ? ` [${tec.nome}]` : '';
       o.cores.forEach(c => {
-        // Verifica se há entrada de estoque com esse tecido + cor
-        const tecLabel = tec ? ` [${tec.nome}]` : '';
-        if (totalPedido > 0) {
-          const sizeLine = grade.map(s => {
-            const q = (o.quantidades||{})[s];
-            return q > 0 ? `${SIZE_LABELS[s]||s}:${q}` : '';
-          }).filter(Boolean).join(' ');
-          msg += `  🎨 ${c.cor}${tecLabel}${sizeLine ? ' — ' + sizeLine + ' pç' : ''}\n`;
-        } else {
-          const sizeLine = grade.map(s => `${s}:${mpr} pç`).join(' ');
-          msg += `  🎨 ${c.cor}${tecLabel} — ${sizeLine}\n`;
-        }
+        msg += `  🎨 ${c.cor}${tecLabel}\n`;
       });
     }
 
