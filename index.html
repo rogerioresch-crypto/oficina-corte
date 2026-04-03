@@ -3076,7 +3076,6 @@ function renderModelos() {
     const unidade = (seg === 'jeans' || seg === 'sarja') ? 'm' : 'kg';
     const consumoStr = m.consumo_unit ? `${m.consumo_unit} ${unidade}/pç` : '—';
     const moStr      = m.valor_mo_unit ? fmtCurrency(m.valor_mo_unit) + '/pç' : '—';
-    const seg = m.segmento || 'malharia';
     const segColor = seg==='jeans'?'#dbeafe':seg==='sarja'?'#dcfce7':'#f0f9ff';
     const segText  = seg==='jeans'?'#1d4ed8':seg==='sarja'?'#15803d':'#0369a1';
     return `<tr>
