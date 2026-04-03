@@ -1953,9 +1953,42 @@ const db = firebase.firestore();
 
 const FB_KEYS = ['oc_oficinas','oc_modelos','oc_ordens','oc_pagamentos','oc_conferencias','oc_tecidos','oc_entradas_estoque','oc_fornecedores','oc_usuarios','oc_auditoria','oc_aviamentos','oc_lavanderias_emp'];
 
+function _recarregarTodosOsDados() {
+  oficinas        = load('oc_oficinas');
+  modelos         = load('oc_modelos');
+  ordens          = load('oc_ordens');
+  pagamentos      = load('oc_pagamentos');
+  tecidos          = load('oc_tecidos');
+  entradasEstoque  = load('oc_entradas_estoque');
+  fornecedores     = load('oc_fornecedores');
+  usuarios         = load('oc_usuarios') || [];
+  aviamentos       = load('oc_aviamentos') || [];
+  lavanderiasEmp   = load('oc_lavanderias_emp') || [];
+}
+
+function _finalizarInit() {
+  // Garante que o spinner some mesmo se chamado mais de uma vez
+  const el = document.getElementById('fb-loading');
+  if (el) el.style.display = 'none';
+  if (verificarSessao()) {
+    aplicarPermissoes();
+    renderDashboard();
+  } else {
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+}
+
 async function initFirebase() {
+  // Timeout de segurança: se Firebase não responder em 6s, usa localStorage
+  const timeout = setTimeout(() => {
+    console.warn('Firebase timeout — usando localStorage');
+    _recarregarTodosOsDados();
+    seedAdminIfNeeded().then(_finalizarInit).catch(_finalizarInit);
+  }, 6000);
+
   try {
     const docs = await Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get()));
+    clearTimeout(timeout);
     let temDados = false;
     docs.forEach((snap, i) => {
       if (snap.exists && snap.data().value) {
@@ -1964,53 +1997,45 @@ async function initFirebase() {
       }
     });
     if (temDados) {
-      // Firebase tem dados → usa eles (ignora seed local)
       _seedPendente = false;
       localStorage.setItem('oc_seeded', '1');
-      oficinas        = load('oc_oficinas');
-      modelos         = load('oc_modelos');
-      ordens          = load('oc_ordens');
-      pagamentos      = load('oc_pagamentos');
-      tecidos          = load('oc_tecidos');
-      entradasEstoque  = load('oc_entradas_estoque');
-      fornecedores     = load('oc_fornecedores');
-      usuarios         = load('oc_usuarios') || [];
     } else {
-      // Firebase vazio → roda seed se necessário
       _runSeedIfNeeded();
     }
+    _recarregarTodosOsDados();
+
     // Listeners em tempo real para sincronizar entre dispositivos
     FB_KEYS.forEach(key => {
       db.collection('data').doc(key).onSnapshot(snap => {
         if (!snap.exists || !snap.data().value) return;
-        if (snap.metadata.hasPendingWrites) return; // ignorar writes locais
-        const val = JSON.parse(snap.data().value || '[]');
-        localStorage.setItem(key, JSON.stringify(val));
-        if (key === 'oc_oficinas')        oficinas        = val;
-        if (key === 'oc_modelos')         modelos         = val;
-        if (key === 'oc_ordens')          ordens          = val;
-        if (key === 'oc_pagamentos')      pagamentos      = val;
-        if (key === 'oc_aviamentos')      aviamentos      = val;
-        if (key === 'oc_lavanderias_emp') lavanderiasEmp  = val;
-        if (key === 'oc_tecidos')          tecidos          = val;
-        if (key === 'oc_entradas_estoque') entradasEstoque  = val;
-        if (key === 'oc_fornecedores')     fornecedores     = val;
-        if (key === 'oc_usuarios')         usuarios         = val;
-        const pg = document.querySelector('.page.active');
-        if (pg) refreshPage(pg.id.replace('page-', ''));
-      });
+        if (snap.metadata.hasPendingWrites) return;
+        try {
+          const val = JSON.parse(snap.data().value || '[]');
+          localStorage.setItem(key, JSON.stringify(val));
+          if (key === 'oc_oficinas')         oficinas        = val;
+          if (key === 'oc_modelos')          modelos         = val;
+          if (key === 'oc_ordens')           ordens          = val;
+          if (key === 'oc_pagamentos')       pagamentos      = val;
+          if (key === 'oc_aviamentos')       aviamentos      = val;
+          if (key === 'oc_lavanderias_emp')  lavanderiasEmp  = val;
+          if (key === 'oc_tecidos')          tecidos          = val;
+          if (key === 'oc_entradas_estoque') entradasEstoque  = val;
+          if (key === 'oc_fornecedores')     fornecedores     = val;
+          if (key === 'oc_usuarios')         usuarios         = val;
+          if (usuarioLogado) {
+            const pg = document.querySelector('.page.active');
+            if (pg) refreshPage(pg.id.replace('page-', ''));
+          }
+        } catch(e) { console.warn('onSnapshot parse error:', e); }
+      }, err => console.warn('onSnapshot error:', key, err));
     });
   } catch(e) {
+    clearTimeout(timeout);
     console.warn('Firebase erro (usando localStorage):', e);
+    _recarregarTodosOsDados();
   } finally {
     await seedAdminIfNeeded();
-    document.getElementById('fb-loading').style.display = 'none';
-    if (verificarSessao()) {
-      aplicarPermissoes();
-      renderDashboard();
-    } else {
-      document.getElementById('login-screen').style.display = 'flex';
-    }
+    _finalizarInit();
   }
 }
 
