@@ -703,6 +703,17 @@
   <div style="font-size:1rem;color:#64748b;font-family:sans-serif">Sincronizando dados...</div>
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+<script>
+  // Failsafe: se em 6s o spinner ainda estiver visível, força login
+  setTimeout(function(){
+    var el = document.getElementById('fb-loading');
+    if (el && el.style.display !== 'none') {
+      el.style.display = 'none';
+      var ls = document.getElementById('login-screen');
+      if (ls && ls.style.display === 'none') ls.style.display = 'flex';
+    }
+  }, 6000);
+</script>
 
 <!-- ============================================================
      HEADER
@@ -2002,12 +2013,9 @@ async function initFirebase() {
     console.warn('Firebase indisponível, usando localStorage:', e.message);
   }
 
-  // 3. Seed admin se necessário (com proteção contra erro)
-  try { await seedAdminIfNeeded(); } catch(e) { console.warn('seed erro:', e); }
-
-  // 4. SEMPRE mostra login/app — independente do que aconteceu acima
+  // 3. SEMPRE mostra login/app IMEDIATAMENTE — sem esperar seed
+  document.getElementById('fb-loading').style.display = 'none';
   try {
-    document.getElementById('fb-loading').style.display = 'none';
     if (verificarSessao()) {
       aplicarPermissoes();
       renderDashboard();
@@ -2016,9 +2024,11 @@ async function initFirebase() {
     }
   } catch(e) {
     console.error('Erro ao iniciar tela:', e);
-    document.getElementById('fb-loading').style.display = 'none';
     document.getElementById('login-screen').style.display = 'flex';
   }
+
+  // 4. Seed admin em background (sem bloquear a tela)
+  seedAdminIfNeeded().catch(e => console.warn('seed erro:', e));
 
   // 5. Listeners em tempo real (background, sem bloquear)
   try {
