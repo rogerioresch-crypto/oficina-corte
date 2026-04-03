@@ -1983,69 +1983,40 @@ function _recarregarTodosOsDados() {
   lavanderiasEmp   = load('oc_lavanderias_emp') || [];
 }
 
-async function initFirebase() {
-  // helper: timeout numa promise
-  function comTimeout(promise, ms) {
-    return Promise.race([
-      promise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
-    ]);
-  }
-
-  // 1. Carrega localStorage imediatamente
+function initFirebase() {
+  // 1. Carrega localStorage e abre o app IMEDIATAMENTE
   _recarregarTodosOsDados();
-
-  // 2. Tenta Firebase com timeout de 4s para ter dados atualizados antes do login
-  try {
-    if (!db) throw new Error('Firebase não disponível');
-    const docs = await comTimeout(
-      Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get().catch(() => ({ exists: false })))),
-      4000
-    );
-    let temDados = false;
-    docs.forEach((snap, i) => {
-      if (snap && snap.exists && snap.data && snap.data().value) {
-        // Não restaura oc_usuarios se tiver hashes de formato antigo
-        if (FB_KEYS[i] === 'oc_usuarios') {
-          try {
-            const arr = JSON.parse(snap.data().value);
-            if (Array.isArray(arr) && arr.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
-              console.warn('oc_usuarios Firebase: hashes antigos ignorados');
-              return;
-            }
-          } catch(e) {}
-        }
-        localStorage.setItem(FB_KEYS[i], snap.data().value);
-        temDados = true;
-      }
-    });
-    if (temDados) {
-      _seedPendente = false;
-      localStorage.setItem('oc_seeded', '1');
-      _recarregarTodosOsDados();
-    } else {
-      _runSeedIfNeeded();
-    }
-  } catch(e) {
-    console.warn('Firebase indisponível, usando localStorage:', e.message);
-  }
-
-  // 3. Abre o app direto — sem login
   document.getElementById('fb-loading').style.display = 'none';
   usuarioLogado = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
-  // Ativa página dashboard antes de renderizar
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  const pd = document.getElementById('page-dashboard');
-  if (pd) pd.classList.add('active');
-  const nt = document.querySelector('[data-page="dashboard"]');
-  if (nt) nt.classList.add('active');
   try { aplicarPermissoes(); } catch(e) { console.error('aplicarPermissoes:', e); }
-  try { renderDashboard(); } catch(e) { console.error('renderDashboard:', e); }
+  try {
+    renderDashboard();
+  } catch(e) {
+    console.error('renderDashboard erro:', e);
+    const ds = document.getElementById('dash-summary');
+    if (ds) ds.innerHTML = '<div style="padding:20px;color:red">Erro ao carregar: ' + e.message + '</div>';
+  }
 
-  // 4. Seed admin (agora síncrono — sem async)
-  try { seedAdminIfNeeded(); } catch(e) { console.warn('seed erro:', e); }
-  _seedAdminPromise = Promise.resolve();
+  // 2. Firebase sync em background (não bloqueia nada)
+  if (db) {
+    Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get().catch(() => null)))
+      .then(docs => {
+        let atualizou = false;
+        docs.forEach((snap, i) => {
+          if (!snap || !snap.exists) return;
+          try {
+            const val = snap.data().value;
+            if (!val) return;
+            localStorage.setItem(FB_KEYS[i], val);
+            atualizou = true;
+          } catch(e) {}
+        });
+        if (atualizou) {
+          _recarregarTodosOsDados();
+          try { renderDashboard(); } catch(e) {}
+        }
+      }).catch(e => console.warn('Firebase sync erro:', e));
+  }
 
   // 5. Listeners em tempo real (background, sem bloquear)
   try {
