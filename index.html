@@ -1959,8 +1959,18 @@ const firebaseConfig = {
   messagingSenderId: "318430116560",
   appId: "1:318430116560:web:71b29d7c543e92ed2e7cd5"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+let db = null;
+try {
+  if (typeof firebase !== 'undefined') {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+  } else {
+    console.warn('Firebase SDK não disponível — modo offline');
+  }
+} catch(e) {
+  console.warn('Firebase init error:', e);
+  db = null;
+}
 
 const FB_KEYS = ['oc_oficinas','oc_modelos','oc_ordens','oc_pagamentos','oc_conferencias','oc_tecidos','oc_entradas_estoque','oc_fornecedores','oc_usuarios','oc_auditoria','oc_aviamentos','oc_lavanderias_emp'];
 
@@ -1991,6 +2001,7 @@ async function initFirebase() {
 
   // 2. Tenta Firebase com timeout de 4s para ter dados atualizados antes do login
   try {
+    if (!db) throw new Error('Firebase não disponível');
     const docs = await comTimeout(
       Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get().catch(() => ({ exists: false })))),
       4000
@@ -1998,6 +2009,16 @@ async function initFirebase() {
     let temDados = false;
     docs.forEach((snap, i) => {
       if (snap && snap.exists && snap.data && snap.data().value) {
+        // Não restaura oc_usuarios se tiver hashes de formato antigo
+        if (FB_KEYS[i] === 'oc_usuarios') {
+          try {
+            const arr = JSON.parse(snap.data().value);
+            if (Array.isArray(arr) && arr.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
+              console.warn('oc_usuarios Firebase: hashes antigos ignorados');
+              return;
+            }
+          } catch(e) {}
+        }
         localStorage.setItem(FB_KEYS[i], snap.data().value);
         temDados = true;
       }
@@ -2033,6 +2054,7 @@ async function initFirebase() {
 
   // 5. Listeners em tempo real (background, sem bloquear)
   try {
+    if (!db) throw new Error('Firebase não disponível');
     FB_KEYS.forEach(key => {
       db.collection('data').doc(key).onSnapshot(snap => {
         if (!snap.exists || !snap.data().value) return;
@@ -2049,7 +2071,14 @@ async function initFirebase() {
           if (key === 'oc_tecidos')          tecidos          = val;
           if (key === 'oc_entradas_estoque') entradasEstoque  = val;
           if (key === 'oc_fornecedores')     fornecedores     = val;
-          if (key === 'oc_usuarios')         usuarios         = val;
+          if (key === 'oc_usuarios') {
+            // Ignora dados do Firebase se tiverem hashes de formato antigo
+            if (Array.isArray(val) && val.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
+              console.warn('oc_usuarios do Firebase tem hashes antigos — ignorando sync');
+            } else {
+              usuarios = val;
+            }
+          }
           if (usuarioLogado) {
             const pg = document.querySelector('.page.active');
             if (pg) try { refreshPage(pg.id.replace('page-', '')); } catch(e) {}
@@ -2079,8 +2108,10 @@ function load(key) {
 }
 function save(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
-  db.collection('data').doc(key).set({ value: JSON.stringify(data) })
-    .catch(e => console.warn('Firestore save error:', e));
+  if (db) {
+    db.collection('data').doc(key).set({ value: JSON.stringify(data) })
+      .catch(e => console.warn('Firestore save error:', e));
+  }
 }
 
 let oficinas   = load('oc_oficinas');
