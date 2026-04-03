@@ -1966,32 +1966,28 @@ function _recarregarTodosOsDados() {
   lavanderiasEmp   = load('oc_lavanderias_emp') || [];
 }
 
-function _finalizarInit() {
-  // Garante que o spinner some mesmo se chamado mais de uma vez
-  const el = document.getElementById('fb-loading');
-  if (el) el.style.display = 'none';
+async function initFirebase() {
+  // 1. IMEDIATAMENTE: carrega localStorage e mostra login/app
+  _recarregarTodosOsDados();
+  await seedAdminIfNeeded();
+  document.getElementById('fb-loading').style.display = 'none';
   if (verificarSessao()) {
     aplicarPermissoes();
     renderDashboard();
   } else {
     document.getElementById('login-screen').style.display = 'flex';
   }
-}
 
-async function initFirebase() {
-  // Timeout de segurança: se Firebase não responder em 6s, usa localStorage
-  const timeout = setTimeout(() => {
-    console.warn('Firebase timeout — usando localStorage');
-    _recarregarTodosOsDados();
-    seedAdminIfNeeded().then(_finalizarInit).catch(_finalizarInit);
-  }, 6000);
-
+  // 2. EM BACKGROUND: sincroniza com Firebase sem bloquear
   try {
-    const docs = await Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get()));
-    clearTimeout(timeout);
+    const docs = await Promise.all(
+      FB_KEYS.map(k => db.collection('data').doc(k).get()
+        .catch(() => ({ exists: false })) // ignora erro individual
+      )
+    );
     let temDados = false;
     docs.forEach((snap, i) => {
-      if (snap.exists && snap.data().value) {
+      if (snap.exists && snap.data && snap.data().value) {
         localStorage.setItem(FB_KEYS[i], snap.data().value);
         temDados = true;
       }
@@ -1999,12 +1995,21 @@ async function initFirebase() {
     if (temDados) {
       _seedPendente = false;
       localStorage.setItem('oc_seeded', '1');
+      _recarregarTodosOsDados();
+      // Atualiza a página atual se usuário já estiver logado
+      if (usuarioLogado) {
+        const pg = document.querySelector('.page.active');
+        if (pg) refreshPage(pg.id.replace('page-', ''));
+      }
     } else {
       _runSeedIfNeeded();
     }
-    _recarregarTodosOsDados();
+  } catch(e) {
+    console.warn('Firebase sync erro:', e);
+  }
 
-    // Listeners em tempo real para sincronizar entre dispositivos
+  // 3. Listeners em tempo real para sincronizar entre dispositivos
+  try {
     FB_KEYS.forEach(key => {
       db.collection('data').doc(key).onSnapshot(snap => {
         if (!snap.exists || !snap.data().value) return;
@@ -2026,16 +2031,11 @@ async function initFirebase() {
             const pg = document.querySelector('.page.active');
             if (pg) refreshPage(pg.id.replace('page-', ''));
           }
-        } catch(e) { console.warn('onSnapshot parse error:', e); }
-      }, err => console.warn('onSnapshot error:', key, err));
+        } catch(e2) { console.warn('onSnapshot parse error:', e2); }
+      }, err => console.warn('onSnapshot error:', key, err.code));
     });
   } catch(e) {
-    clearTimeout(timeout);
-    console.warn('Firebase erro (usando localStorage):', e);
-    _recarregarTodosOsDados();
-  } finally {
-    await seedAdminIfNeeded();
-    _finalizarInit();
+    console.warn('Firebase listeners erro:', e);
   }
 }
 
