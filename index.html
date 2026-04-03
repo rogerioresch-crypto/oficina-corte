@@ -671,7 +671,7 @@
 <body>
 <!-- Loading overlay enquanto sincroniza com Firebase -->
 <!-- Tela de Login -->
-<div id="login-screen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);z-index:10000;align-items:center;justify-content:center">
+<div id="login-screen" style="display:none!important;position:fixed;inset:0;background:linear-gradient(135deg,#1d4ed8,#0ea5e9);z-index:10000;align-items:center;justify-content:center">
   <div style="background:#fff;border-radius:20px;padding:40px 36px;width:360px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.25)">
     <div style="text-align:center;margin-bottom:28px">
       <div style="font-size:2.5rem;margin-bottom:8px">✂️</div>
@@ -704,15 +704,11 @@
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <script>
-  // Failsafe: se em 6s o spinner ainda estiver visível, força login
+  // Failsafe: se em 6s o spinner ainda estiver visível, esconde — sem mostrar login
   setTimeout(function(){
     var el = document.getElementById('fb-loading');
-    if (el && el.style.display !== 'none') {
-      el.style.display = 'none';
-      var ls = document.getElementById('login-screen');
-      if (ls && ls.style.display === 'none') ls.style.display = 'flex';
-    }
-  }, 6000);
+    if (el) el.style.display = 'none';
+  }, 3000);
 </script>
 
 <!-- ============================================================
