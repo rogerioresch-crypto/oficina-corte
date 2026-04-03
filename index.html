@@ -2027,8 +2027,9 @@ async function initFirebase() {
     document.getElementById('login-screen').style.display = 'flex';
   }
 
-  // 4. Seed admin em background — guarda promise para fazerLogin aguardar
-  _seedAdminPromise = seedAdminIfNeeded().catch(e => console.warn('seed erro:', e));
+  // 4. Seed admin (agora síncrono — sem async)
+  try { seedAdminIfNeeded(); } catch(e) { console.warn('seed erro:', e); }
+  _seedAdminPromise = Promise.resolve();
 
   // 5. Listeners em tempo real (background, sem bloquear)
   try {
@@ -4919,19 +4920,39 @@ function _populateTecidoSelect() {
    AUTENTICAÇÃO E USUÁRIOS
 ============================================================ */
 
-async function hashSenha(senha) {
-  const data = new TextEncoder().encode(senha);
-  const buf  = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+// Hash síncrono FNV-1a (sem crypto.subtle — funciona em qualquer contexto)
+const _HASH_VER = 'f1_';
+function hashSenha(senha) {
+  let h = 2166136261;
+  for (let i = 0; i < senha.length; i++) {
+    h ^= senha.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return _HASH_VER + (h >>> 0).toString(16).padStart(8,'0');
 }
 
-async function seedAdminIfNeeded() {
-  // Relê do localStorage (pode ter sido atualizado pelo get() do Firebase)
+function seedAdminIfNeeded() {
+  // Relê do localStorage (pode ter sido atualizado pelo Firebase)
   const latest = load('oc_usuarios');
-  if (latest && latest.length) { usuarios = latest; return; }
-  if (usuarios && usuarios.length) return;
-  const hash = await hashSenha('admin123');
-  const admin = { id: uid(), nome: 'Administrador', usuario: 'admin', senha_hash: hash, role: 'admin', ativo: true };
+  if (latest && latest.length) {
+    // Verifica se hashes são do formato atual; se não, limpa e recria
+    if (latest.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
+      console.warn('Hashes desatualizados — recriando usuários');
+      localStorage.removeItem('oc_usuarios');
+      usuarios = [];
+    } else {
+      usuarios = latest;
+      // Garante que admin padrão existe
+      if (!usuarios.find(u => u.usuario === 'admin')) {
+        const admin = { id: uid(), nome: 'Administrador', usuario: 'admin', senha_hash: hashSenha('admin123'), role: 'admin', ativo: true };
+        usuarios.push(admin);
+        save('oc_usuarios', usuarios);
+      }
+      return;
+    }
+  }
+  // Cria admin padrão
+  const admin = { id: uid(), nome: 'Administrador', usuario: 'admin', senha_hash: hashSenha('admin123'), role: 'admin', ativo: true };
   usuarios = [admin];
   save('oc_usuarios', usuarios);
 }
@@ -4946,7 +4967,7 @@ function verificarSessao() {
   } catch { return false; }
 }
 
-async function fazerLogin() {
+function fazerLogin() {
   const loginEl = document.getElementById('login-usuario');
   const senhaEl = document.getElementById('login-senha');
   const erroEl  = document.getElementById('login-erro');
@@ -4954,11 +4975,7 @@ async function fazerLogin() {
   const senha   = senhaEl.value;
   erroEl.style.display = 'none';
   if (!usuario || !senha) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
-  // Aguarda seed do admin (caso ainda esteja rodando em background)
-  erroEl.textContent = 'Verificando...'; erroEl.style.display = '';
-  try { await _seedAdminPromise; } catch(e) {}
-  erroEl.style.display = 'none';
-  const hash = await hashSenha(senha);
+  const hash = hashSenha(senha);
   // Relê do localStorage para garantir dados mais recentes
   const usuariosAtual = load('oc_usuarios') || usuarios || [];
   if (usuariosAtual.length) usuarios = usuariosAtual;
@@ -5085,7 +5102,7 @@ function openUsuarioModal(id) {
   document.getElementById('modal-usuario').classList.add('open');
 }
 
-async function saveUsuario() {
+function saveUsuario() {
   const id       = document.getElementById('usuario-id').value;
   const nome     = document.getElementById('usuario-nome').value.trim();
   const login    = document.getElementById('usuario-login').value.trim().toLowerCase();
@@ -5109,10 +5126,9 @@ async function saveUsuario() {
   if (id) {
     const idx = usuarios.findIndex(u => u.id === id);
     usuarios[idx] = { ...usuarios[idx], nome, usuario: login, role, ativo, oficina_id, oficina_nome };
-    if (senha) usuarios[idx].senha_hash = await hashSenha(senha);
+    if (senha) usuarios[idx].senha_hash = hashSenha(senha);
   } else {
-    const hash = await hashSenha(senha);
-    usuarios.push({ id: uid(), nome, usuario: login, senha_hash: hash, role, ativo: true, oficina_id, oficina_nome });
+    usuarios.push({ id: uid(), nome, usuario: login, senha_hash: hashSenha(senha), role, ativo: true, oficina_id, oficina_nome });
   }
   save('oc_usuarios', usuarios);
   closeModal('modal-usuario');
