@@ -1967,27 +1967,26 @@ function _recarregarTodosOsDados() {
 }
 
 async function initFirebase() {
-  // 1. IMEDIATAMENTE: carrega localStorage e mostra login/app
-  _recarregarTodosOsDados();
-  await seedAdminIfNeeded();
-  document.getElementById('fb-loading').style.display = 'none';
-  if (verificarSessao()) {
-    aplicarPermissoes();
-    renderDashboard();
-  } else {
-    document.getElementById('login-screen').style.display = 'flex';
+  // helper: timeout numa promise
+  function comTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+    ]);
   }
 
-  // 2. EM BACKGROUND: sincroniza com Firebase sem bloquear
+  // 1. Carrega localStorage imediatamente
+  _recarregarTodosOsDados();
+
+  // 2. Tenta Firebase com timeout de 4s para ter dados atualizados antes do login
   try {
-    const docs = await Promise.all(
-      FB_KEYS.map(k => db.collection('data').doc(k).get()
-        .catch(() => ({ exists: false })) // ignora erro individual
-      )
+    const docs = await comTimeout(
+      Promise.all(FB_KEYS.map(k => db.collection('data').doc(k).get().catch(() => ({ exists: false })))),
+      4000
     );
     let temDados = false;
     docs.forEach((snap, i) => {
-      if (snap.exists && snap.data && snap.data().value) {
+      if (snap && snap.exists && snap.data && snap.data().value) {
         localStorage.setItem(FB_KEYS[i], snap.data().value);
         temDados = true;
       }
@@ -1996,19 +1995,32 @@ async function initFirebase() {
       _seedPendente = false;
       localStorage.setItem('oc_seeded', '1');
       _recarregarTodosOsDados();
-      // Atualiza a página atual se usuário já estiver logado
-      if (usuarioLogado) {
-        const pg = document.querySelector('.page.active');
-        if (pg) refreshPage(pg.id.replace('page-', ''));
-      }
     } else {
       _runSeedIfNeeded();
     }
   } catch(e) {
-    console.warn('Firebase sync erro:', e);
+    console.warn('Firebase indisponível, usando localStorage:', e.message);
   }
 
-  // 3. Listeners em tempo real para sincronizar entre dispositivos
+  // 3. Seed admin se necessário (com proteção contra erro)
+  try { await seedAdminIfNeeded(); } catch(e) { console.warn('seed erro:', e); }
+
+  // 4. SEMPRE mostra login/app — independente do que aconteceu acima
+  try {
+    document.getElementById('fb-loading').style.display = 'none';
+    if (verificarSessao()) {
+      aplicarPermissoes();
+      renderDashboard();
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } catch(e) {
+    console.error('Erro ao iniciar tela:', e);
+    document.getElementById('fb-loading').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  // 5. Listeners em tempo real (background, sem bloquear)
   try {
     FB_KEYS.forEach(key => {
       db.collection('data').doc(key).onSnapshot(snap => {
@@ -2029,9 +2041,9 @@ async function initFirebase() {
           if (key === 'oc_usuarios')         usuarios         = val;
           if (usuarioLogado) {
             const pg = document.querySelector('.page.active');
-            if (pg) refreshPage(pg.id.replace('page-', ''));
+            if (pg) try { refreshPage(pg.id.replace('page-', '')); } catch(e) {}
           }
-        } catch(e2) { console.warn('onSnapshot parse error:', e2); }
+        } catch(e) { console.warn('onSnapshot parse error:', e); }
       }, err => console.warn('onSnapshot error:', key, err.code));
     });
   } catch(e) {
