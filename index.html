@@ -704,11 +704,30 @@
 </div>
 <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <script>
-  // Failsafe: se em 6s o spinner ainda estiver visível, esconde — sem mostrar login
+  // Failsafe + diagnóstico: esconde spinner e mostra erro se JS principal falhar
   setTimeout(function(){
     var el = document.getElementById('fb-loading');
     if (el) el.style.display = 'none';
+    // Se dashboard ainda estiver vazio, mostra erro
+    var ds = document.getElementById('dash-summary');
+    if (ds && !ds.innerHTML.trim()) {
+      ds.innerHTML = '<div style="padding:30px;background:#fef2f2;border:2px solid #f87171;border-radius:12px;color:#dc2626;font-family:sans-serif">'
+        + '<b>Erro de inicialização</b><br>'
+        + 'JS travou antes de renderizar. Verifique o console do navegador (F12).'
+        + '</div>';
+      document.getElementById('page-dashboard').classList.add('active');
+    }
   }, 3000);
+  // Captura erros globais de JS
+  window.onerror = function(msg, src, line, col, err) {
+    var el = document.getElementById('fb-loading');
+    if (el) el.style.display = 'none';
+    var body = document.body;
+    var div = document.createElement('div');
+    div.style = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#dc2626;color:#fff;padding:16px;font-family:monospace;font-size:14px';
+    div.textContent = 'ERRO JS: ' + msg + ' (linha ' + line + ')';
+    body.prepend(div);
+  };
 </script>
 
 <!-- ============================================================
