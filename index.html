@@ -2027,8 +2027,8 @@ async function initFirebase() {
     document.getElementById('login-screen').style.display = 'flex';
   }
 
-  // 4. Seed admin em background (sem bloquear a tela)
-  seedAdminIfNeeded().catch(e => console.warn('seed erro:', e));
+  // 4. Seed admin em background — guarda promise para fazerLogin aguardar
+  _seedAdminPromise = seedAdminIfNeeded().catch(e => console.warn('seed erro:', e));
 
   // 5. Listeners em tempo real (background, sem bloquear)
   try {
@@ -2102,6 +2102,7 @@ let usuarioLogado     = null; // { id, nome, usuario, role }
    SAMPLE DATA (first run — apenas se Firebase e localStorage vazios)
 ============================================================ */
 var _seedPendente = !localStorage.getItem('oc_seeded');
+var _seedAdminPromise = Promise.resolve();
 function _runSeedIfNeeded() { if (!_seedPendente) return; _seedPendente = false;
 if (!localStorage.getItem('oc_seeded')) {
   modelos = [
@@ -4953,6 +4954,10 @@ async function fazerLogin() {
   const senha   = senhaEl.value;
   erroEl.style.display = 'none';
   if (!usuario || !senha) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
+  // Aguarda seed do admin (caso ainda esteja rodando em background)
+  erroEl.textContent = 'Verificando...'; erroEl.style.display = '';
+  try { await _seedAdminPromise; } catch(e) {}
+  erroEl.style.display = 'none';
   const hash = await hashSenha(senha);
   // Relê do localStorage para garantir dados mais recentes
   const usuariosAtual = load('oc_usuarios') || usuarios || [];
