@@ -5001,55 +5001,31 @@ function verificarSessao() {
 }
 
 function fazerLogin() {
-  const loginEl = document.getElementById('login-usuario');
-  const senhaEl = document.getElementById('login-senha');
-  const erroEl  = document.getElementById('login-erro');
-  try {
-  const usuario = loginEl.value.trim();
-  const senha   = senhaEl.value;
+  const u = document.getElementById('login-usuario').value.trim();
+  const s = document.getElementById('login-senha').value;
+  const erroEl = document.getElementById('login-erro');
   erroEl.style.display = 'none';
-  if (!usuario || !senha) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
+  if (!u || !s) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
 
-  // ── Bypass garantido para admin padrão ──────────────────────────
-  let user = null;
-  if (usuario === 'admin' && senha === 'admin123') {
+  // Admin padrão — sem depender de nada, direto
+  let userObj = null;
+  if (u === 'admin' && s === 'admin123') {
+    userObj = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
+  } else {
+    // Outros usuários — busca no localStorage com hash FNV
+    const hash = hashSenha(s);
     let arr = [];
     try { arr = JSON.parse(localStorage.getItem('oc_usuarios') || '[]'); } catch(e) {}
-    arr = arr.filter(u => !u.senha_hash || u.senha_hash.startsWith(_HASH_VER));
-    if (!arr.find(u => u.usuario === 'admin')) {
-      arr.push({ id: uid(), nome: 'Administrador', usuario: 'admin', senha_hash: hashSenha('admin123'), role: 'admin', ativo: true });
-    }
-    usuarios = arr;
-    try { save('oc_usuarios', arr); } catch(e) {}
-    user = arr.find(u => u.usuario === 'admin');
+    userObj = arr.find(x => x.usuario === u && x.senha_hash === hash && x.ativo !== false) || null;
   }
 
-  // ── Login normal para outros usuários ───────────────────────────
-  if (!user) {
-    const hash = hashSenha(senha);
-    let arr = [];
-    try { arr = JSON.parse(localStorage.getItem('oc_usuarios') || '[]'); } catch(e) {}
-    arr = arr.filter(u => !u.senha_hash || u.senha_hash.startsWith(_HASH_VER));
-    if (arr.length) usuarios = arr;
-    user = usuarios.find(u => u.usuario === usuario && u.senha_hash === hash && u.ativo !== false);
-  }
+  if (!userObj) { erroEl.textContent = 'Usuário ou senha incorretos.'; erroEl.style.display = ''; return; }
 
-  if (!user) { erroEl.textContent = 'Usuário ou senha incorretos.'; erroEl.style.display = ''; senhaEl.value = ''; return; }
-  usuarioLogado = { id: user.id, nome: user.nome, usuario: user.usuario, role: user.role, oficina_id: user.oficina_id || '', oficina_nome: user.oficina_nome || '' };
+  usuarioLogado = { id: userObj.id, nome: userObj.nome, usuario: userObj.usuario, role: userObj.role, oficina_id: userObj.oficina_id || '', oficina_nome: userObj.oficina_nome || '' };
   localStorage.setItem('oc_sessao', JSON.stringify({ ...usuarioLogado, timestamp: Date.now() }));
   document.getElementById('login-screen').style.display = 'none';
-  try { aplicarPermissoes(); } catch(e) { console.error('aplicarPermissoes erro:', e); }
-  try { renderDashboard(); } catch(e) {
-    console.error('renderDashboard erro:', e);
-    erroEl.textContent = 'Erro ao carregar app: ' + e.message;
-    erroEl.style.display = '';
-    document.getElementById('login-screen').style.display = 'flex';
-  }
-  } catch(eGlobal) {
-    erroEl.textContent = 'Erro inesperado: ' + eGlobal.message;
-    erroEl.style.display = '';
-    console.error('fazerLogin erro global:', eGlobal);
-  }
+  aplicarPermissoes();
+  renderDashboard();
 }
 
 function fazerLogout() {
