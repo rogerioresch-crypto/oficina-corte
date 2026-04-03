@@ -2139,26 +2139,29 @@ if (!localStorage.getItem('oc_seeded')) {
     {
       id: 'mod1',
       nome: 'Camiseta Básica',
+      segmento: 'malharia',
       descricao: 'Camiseta de malha 100% algodão, gola careca',
       grade: ['P','M','G','GG'],
-      consumo_kg: { P: 0.18, M: 0.21, G: 0.24, GG: 0.27 },
-      valor_mo:   { P: 2.50, M: 2.50, G: 2.80, GG: 3.00 }
+      consumo_unit: 0.22,
+      valor_mo_unit: 2.70
     },
     {
       id: 'mod2',
       nome: 'Regata Feminina',
+      segmento: 'malharia',
       descricao: 'Regata de malha viscose, alça fina',
       grade: ['P','M','G'],
-      consumo_kg: { P: 0.12, M: 0.14, G: 0.16 },
-      valor_mo:   { P: 2.00, M: 2.00, G: 2.20 }
+      consumo_unit: 0.14,
+      valor_mo_unit: 2.10
     },
     {
       id: 'mod3',
       nome: 'Shorts Moletom',
+      segmento: 'malharia',
       descricao: 'Shorts em moletom, elástico na cintura',
       grade: ['U'],
-      consumo_kg: { U: 0.35 },
-      valor_mo:   { U: 3.50 }
+      consumo_unit: 0.35,
+      valor_mo_unit: 3.50
     }
   ];
 
@@ -3483,8 +3486,8 @@ function updateOrdemCalc() {
   if (m) {
     m.grade.forEach(s => {
       const qty = parseInt(document.getElementById('qtd-'+s)?.value) || 0;
-      kgEst += qty * (m.consumo_kg[s] || 0);
-      mo    += qty * (m.valor_mo[s] || 0);
+      kgEst += qty * (m.consumo_unit || 0);
+      mo    += qty * (m.valor_mo_unit || 0);
       total += qty;
     });
   }
@@ -3521,8 +3524,8 @@ function saveOrdem() {
     m.grade.forEach(s => {
       const q = parseInt(document.getElementById('qtd-'+s)?.value) || 0;
       if (q) quantidades[s] = q;
-      kgEst += q * (m.consumo_kg[s] || 0);
-      mo    += q * (m.valor_mo[s] || 0);
+      kgEst += q * (m.consumo_unit || 0);
+      mo    += q * (m.valor_mo_unit || 0);
     });
   }
 
@@ -4148,7 +4151,7 @@ function saveCorteLote() {
   if (tipo === 'conferencia') {
     novos.forEach(nc => {
       const totalPecas = grade.reduce((a,s)=>a+(nc.qtd[s]||0),0);
-      const moValor    = m ? grade.reduce((a,s)=>a+(nc.qtd[s]||0)*(m.valor_mo[s]||0),0) : 0;
+      const moValor    = m ? grade.reduce((a,s)=>a+(nc.qtd[s]||0),0) * (m.valor_mo_unit||0) : 0;
       const def        = nc.defeitos || 0;
       const avgPreco        = (totalPecas > 0 && moValor > 0) ? moValor / totalPecas : 0;
       const desconto_def    = parseFloat((def * avgPreco).toFixed(2));
@@ -4301,7 +4304,7 @@ function renderCorteHistory(o, m) {
       // Valor pago
       let valorCell = '';
       if (showDef && m) {
-        const moValor = grade.reduce((a,s)=>a+(Number((c.qtd||{})[s])||0)*(m.valor_mo[s]||0),0);
+        const moValor = grade.reduce((a,s)=>a+(Number((c.qtd||{})[s])||0),0) * (m.valor_mo_unit||0);
         const avgP    = tot > 0 ? moValor/tot : 0;
         const desconto= parseFloat((def*avgP).toFixed(2));
         const liquido = Math.max(0, moValor - desconto);
