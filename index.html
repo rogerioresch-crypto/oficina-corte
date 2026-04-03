@@ -727,7 +727,7 @@
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px" id="header-user-area">
     <span id="header-role-badge" style="font-size:.72rem;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:20px;font-weight:600"></span>
     <span id="header-nome-usuario" style="font-size:.82rem;font-weight:600;opacity:.95"></span>
-    <button onclick="fazerLogout()"
+    <button onclick="fazerLogout()" style="display:none"
       style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 12px;border-radius:7px;font-size:.78rem;cursor:pointer;font-weight:600">
       Sair
     </button>
@@ -2034,19 +2034,11 @@ async function initFirebase() {
     console.warn('Firebase indisponível, usando localStorage:', e.message);
   }
 
-  // 3. SEMPRE mostra login/app IMEDIATAMENTE — sem esperar seed
+  // 3. Abre o app direto — sem login
   document.getElementById('fb-loading').style.display = 'none';
-  try {
-    if (verificarSessao()) {
-      aplicarPermissoes();
-      renderDashboard();
-    } else {
-      document.getElementById('login-screen').style.display = 'flex';
-    }
-  } catch(e) {
-    console.error('Erro ao iniciar tela:', e);
-    document.getElementById('login-screen').style.display = 'flex';
-  }
+  usuarioLogado = { id: 'admin-fixo', nome: 'Administrador', usuario: 'admin', role: 'admin', oficina_id: '', oficina_nome: '' };
+  try { aplicarPermissoes(); } catch(e) {}
+  try { renderDashboard(); } catch(e) { console.error('renderDashboard:', e); }
 
   // 4. Seed admin (agora síncrono — sem async)
   try { seedAdminIfNeeded(); } catch(e) { console.warn('seed erro:', e); }
