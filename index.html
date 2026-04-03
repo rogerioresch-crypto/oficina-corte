@@ -1859,11 +1859,11 @@
 </div>
 
 <!-- Modal: Gerar Ficha de Corte -->
-<div class="modal-overlay" id="modal-ficha">
+<div class="modal-overlay" id="modal-ficha-corte">
   <div class="modal" style="max-width:660px">
     <div class="modal-header">
       <h2>📄 Gerar Ficha de Corte</h2>
-      <button class="modal-close" onclick="closeModal('modal-ficha')">✕</button>
+      <button class="modal-close" onclick="closeModal('modal-ficha-corte')">✕</button>
     </div>
     <div class="modal-body">
       <div class="form-grid form-grid-2">
@@ -1888,7 +1888,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-ficha')">Cancelar</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-ficha-corte')">Cancelar</button>
       <button class="btn" id="btn-ficha-wpp" onclick="enviarFichaWhatsApp()"
         style="background:#16a34a;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
         📱 Enviar WhatsApp
@@ -2717,7 +2717,7 @@ function openFichaModal() {
   document.getElementById('ficha-data').value = new Date().toISOString().slice(0,10);
   document.getElementById('ficha-obs').value = '';
   renderFichaOrdens();
-  document.getElementById('modal-ficha').classList.add('open');
+  document.getElementById('modal-ficha-corte').classList.add('open');
 }
 
 function renderFichaOrdens() {
@@ -2862,7 +2862,7 @@ function imprimirFicha() {
   </div>`;
 
   document.getElementById('ficha-print-area').innerHTML = html;
-  closeModal('modal-ficha');
+  closeModal('modal-ficha-corte');
   setTimeout(() => window.print(), 150);
 }
 
