@@ -2045,7 +2045,32 @@ function initFirebase() {
           try {
             const val = snap.data().value;
             if (!val) return;
-            localStorage.setItem(FB_KEYS[i], val);
+            const key = FB_KEYS[i];
+            // oc_usuarios: merge Firebase + local, local tem prioridade
+            if (key === 'oc_usuarios') {
+              try {
+                const fbUsers = JSON.parse(val);
+                // Ignora se Firebase tem hashes antigos
+                if (Array.isArray(fbUsers) && fbUsers.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
+                  console.warn('oc_usuarios Firebase sync inicial: hashes antigos — ignorando');
+                  return;
+                }
+                const localUsers = load('oc_usuarios') || [];
+                // Merge: pega todos locais + usuários do Firebase que não existem localmente
+                const merged = [...localUsers];
+                (fbUsers || []).forEach(fu => {
+                  if (!merged.find(lu => lu.id === fu.id)) merged.push(fu);
+                });
+                localStorage.setItem(key, JSON.stringify(merged));
+                // Salva merged de volta no Firebase se for diferente
+                if (merged.length !== (fbUsers||[]).length) {
+                  db.collection('data').doc(key).set({ value: JSON.stringify(merged) }).catch(() => {});
+                }
+                atualizou = true;
+              } catch(e) {}
+              return;
+            }
+            localStorage.setItem(key, val);
             atualizou = true;
           } catch(e) {}
         });
@@ -2069,10 +2094,18 @@ function initFirebase() {
           if (key === 'oc_usuarios') {
             if (Array.isArray(val) && val.some(u => u.senha_hash && !u.senha_hash.startsWith(_HASH_VER))) {
               console.warn('oc_usuarios Firebase: hashes antigos — ignorando sync');
-              return; // não salva no localStorage nem na variável
+              return;
             }
-            localStorage.setItem(key, JSON.stringify(val));
-            usuarios = val;
+            // Merge: mantém usuários locais + traz novos do Firebase
+            const localUsers = load('oc_usuarios') || [];
+            const merged = [...localUsers];
+            (val || []).forEach(fu => {
+              const idx = merged.findIndex(lu => lu.id === fu.id);
+              if (idx === -1) merged.push(fu); // usuário novo do Firebase
+              // se já existe localmente, local tem prioridade (não sobrescreve)
+            });
+            localStorage.setItem(key, JSON.stringify(merged));
+            usuarios = merged;
           } else {
             localStorage.setItem(key, JSON.stringify(val));
             if (key === 'oc_oficinas')         oficinas        = val;
