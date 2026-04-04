@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Marketing Dashboard — Underdown</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #f0f4f8;
+  color: #1e293b;
+  min-height: 100vh;
+}
+button { cursor: pointer; font-family: inherit; }
+input, select, textarea { font-family: inherit; font-size: 0.93rem; }
+
+/* ── HEADER ── */
+.app-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 60%, #0ea5e9 100%);
+  color: #fff;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 62px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.25);
+  position: sticky; top: 0; z-index: 100;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-logo { font-size: 1.4rem; }
+.header-left h1 { font-size: 1.15rem; font-weight: 700; }
+.header-left .sub { font-size: .78rem; opacity: .7; }
+.month-selector {
+  display: flex; align-items: center; gap: 8px;
+}
+.month-selector select {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: .9rem;
+  cursor: pointer;
+}
+.month-selector select option { background: #1e3a5f; color: #fff; }
+
+/* ── NAV ── */
+.nav-tabs {
+  background: #fff;
+  border-bottom: 2px solid #e2e8f0;
+  display: flex;
+  padding: 0 24px;
+  overflow-x: auto;
+  gap: 2px;
+  position: sticky; top: 62px; z-index: 99;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.nav-tab {
+  padding: 13px 20px;
+  font-size: .87rem;
+  font-weight: 600;
+  color: #64748b;
+  border: none;
+  background: none;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+  transition: color .2s, border-color .2s;
+}
+.nav-tab:hover { color: #0ea5e9; }
+.nav-tab.active { color: #0ea5e9; border-bottom-color: #0ea5e9; }
+
+/* ── PAGES ── */
+.page { display: none; padding: 24px; max-width: 1300px; margin: 0 auto; }
+.page.active { display: block; }
+
+/* ── CARDS ── */
+.card {
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+  padding: 22px 24px;
+  margin-bottom: 22px;
+}
+.card-title {
+  font-size: .78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: #94a3b8;
+  margin-bottom: 16px;
+}
+
+/* ── KPI GRID ── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 22px;
+}
+.kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.04);
+  border-left: 4px solid #e2e8f0;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card.green  { border-left-color: #10b981; }
+.kpi-card.blue   { border-left-color: #3b82f6; }
+.kpi-card.orange { border-left-color: #f59e0b; }
+.kpi-card.red    { border-left-color: #ef4444; }
+.kpi-card.purple { border-left-color: #8b5cf6; }
+.kpi-card.teal   { border-left-color: #0ea5e9; }
+
+.kpi-label { font-size: .75rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+.kpi-value { font-size: 1.6rem; font-weight: 800; color: #0f172a; line-height: 1; }
+.kpi-sub   { font-size: .78rem; color: #64748b; margin-top: 5px; }
+.kpi-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 20px;
+  font-size: .72rem; font-weight: 700; margin-left: 6px;
+}
+.badge-green  { background: #d1fae5; color: #059669; }
+.badge-red    { background: #fee2e2; color: #dc2626; }
+.badge-orange { background: #fef3c7; color: #d97706; }
+
+/* ── PROGRESS BAR ── */
+.progress-bar {
+  height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; margin-top: 8px;
+}
+.progress-fill {
+  height: 100%; border-radius: 99px; transition: width .5s ease;
+  background: linear-gradient(90deg, #0ea5e9, #3b82f6);
+}
+.progress-fill.over { background: linear-gradient(90deg, #10b981, #059669); }
+.progress-fill.warn { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+
+/* ── PROGRESS CARD ── */
+.prog-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.prog-label { font-size: .82rem; font-weight: 600; color: #475569; min-width: 140px; }
+.prog-wrap  { flex: 1; }
+.prog-nums  { display: flex; justify-content: space-between; font-size: .78rem; color: #94a3b8; margin-bottom: 4px; }
+.prog-pct   { min-width: 52px; text-align: right; font-size: .82rem; font-weight: 700; color: #0f172a; }
+
+/* ── GRID LAYOUTS ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 22px; }
+@media (max-width: 900px) {
+  .two-col, .three-col { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── TABLE ── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+th {
+  background: #f8fafc; color: #64748b; font-weight: 700;
+  font-size: .73rem; text-transform: uppercase; letter-spacing: .5px;
+  padding: 10px 12px; border-bottom: 2px solid #e2e8f0; white-space: nowrap;
+  text-align: right;
+}
+th:first-child { text-align: left; }
+td {
+  padding: 9px 12px; border-bottom: 1px solid #f1f5f9;
+  color: #334155; text-align: right; white-space: nowrap;
+}
+td:first-child { text-align: left; font-weight: 600; }
+tr:hover td { background: #f8fafc; }
+tr.today-row td { background: #eff6ff; font-weight: 700; }
+.num-green { color: #059669; }
+.num-red   { color: #dc2626; }
+
+/* ── FORM ── */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: .78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .5px; }
+.form-group input, .form-group select, .form-group textarea {
+  border: 1.5px solid #e2e8f0; border-radius: 8px;
+  padding: 9px 12px; font-size: .93rem;
+  transition: border-color .2s, box-shadow .2s;
+  background: #fff;
+}
+.form-group input:focus, .form-group select:focus {
+  outline: none; border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14,165,233,.12);
+}
+.form-section-title {
+  font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  color: #94a3b8; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1.5px solid #f1f5f9;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 10px 22px; border-radius: 9px; border: none;
+  font-weight: 700; font-size: .88rem; transition: all .18s;
+}
+.btn-primary { background: #0ea5e9; color: #fff; }
+.btn-primary:hover { background: #0284c7; }
+.btn-ghost { background: #f1f5f9; color: #475569; }
+.btn-ghost:hover { background: #e2e8f0; }
+.btn-danger { background: #fee2e2; color: #dc2626; }
+.btn-danger:hover { background: #fecaca; }
+.btn-success { background: #d1fae5; color: #059669; }
+.btn-success:hover { background: #a7f3d0; }
+
+/* ── CHANNEL BARS ── */
+.channel-list { display: flex; flex-direction: column; gap: 10px; }
+.channel-row { display: flex; align-items: center; gap: 10px; }
+.channel-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.channel-name { font-size: .82rem; font-weight: 600; min-width: 130px; color: #334155; }
+.channel-bar-wrap { flex: 1; height: 6px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+.channel-bar { height: 100%; border-radius: 99px; }
+.channel-val { font-size: .82rem; font-weight: 700; color: #0f172a; min-width: 90px; text-align: right; }
+.channel-pct { font-size: .75rem; color: #94a3b8; min-width: 42px; text-align: right; }
+
+/* ── ALERT ── */
+.alert {
+  padding: 12px 16px; border-radius: 10px; font-size: .85rem;
+  font-weight: 600; margin-bottom: 16px; display: none;
+}
+.alert.show { display: block; }
+.alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.alert-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+/* ── LOADING ── */
+.loading { text-align: center; padding: 48px; color: #94a3b8; font-size: .9rem; }
+
+/* ── PROJECAO CARD ── */
+.proj-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.proj-item { text-align: center; padding: 14px; background: #f8fafc; border-radius: 10px; }
+.proj-item .lbl { font-size: .72rem; color: #94a3b8; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+.proj-item .val { font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 4px 0; }
+.proj-item .pct { font-size: .78rem; font-weight: 700; }
+
+/* ── SEPARADOR ── */
+.divider { height: 1px; background: #f1f5f9; margin: 20px 0; }
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+  background: #0f172a; color: #fff; padding: 12px 20px;
+  border-radius: 10px; font-size: .88rem; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+  transform: translateY(100px); opacity: 0;
+  transition: all .3s ease;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.ok   { background: #059669; }
+#toast.err  { background: #dc2626; }
+
+/* ── SUMMARY BAR ── */
+.summary-bar {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 24px; background: rgba(255,255,255,.08);
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.sum-item { font-size: .8rem; color: rgba(255,255,255,.85); }
+.sum-item strong { color: #fff; }
+.sum-sep { color: rgba(255,255,255,.3); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="app-header">
+  <div class="header-left">
+    <span class="header-logo">📊</span>
+    <div>
+      <h1>Marketing Dashboard</h1>
+      <div class="sub">Underdown — Controle de Performance</div>
+    </div>
+  </div>
+  <div class="month-selector">
+    <select id="monthSelect" onchange="changeMonth()"></select>
+  </div>
+  <button class="btn" onclick="makeBackup()" title="Fazer backup do banco de dados" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;padding:6px 12px;font-size:.8rem;">
+    💾 Backup
+  </button>
+</header>
+
+<!-- NAV -->
+<nav class="nav-tabs">
+  <button class="nav-tab active" onclick="showPage('dashboard')">📈 Dashboard</button>
+  <button class="nav-tab" onclick="showPage('lancamento')">✏️ Lançamento</button>
+  <button class="nav-tab" onclick="showPage('metas')">🎯 Metas</button>
+  <button class="nav-tab" onclick="showPage('historico')">📅 Histórico</button>
+</nav>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: DASHBOARD
+══════════════════════════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+
+  <!-- KPI Principal Row -->
+  <div class="kpi-grid" id="kpiGrid">
+    <div class="loading">Carregando...</div>
+  </div>
+
+  <!-- Atingimento de Metas -->
+  <div class="card">
+    <div class="card-title">🎯 Atingimento de Metas do Mês</div>
+    <div id="metasProgress"><div class="loading">...</div></div>
+  </div>
+  <div id="projGrid" style="display:none"></div>
+
+  <!-- KPIs secundários -->
+  <div class="card">
+    <div class="card-title">📊 KPIs de Eficiência</div>
+    <div class="kpi-grid" id="kpiEfic"></div>
+  </div>
+
+  <!-- Canais -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">💰 Receita por Canal (GA4)</div>
+      <div class="channel-list" id="channelList"><div class="loading">...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">💸 Investimento por Plataforma</div>
+      <div class="channel-list" id="investList"><div class="loading">...</div></div>
+    </div>
+  </div>
+
+  <!-- Tabela diária -->
+  <div class="card">
+    <div class="card-title">📋 Lançamentos Diários</div>
+    <div class="tbl-wrap">
+      <table id="dailyTable">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Rec. Captada</th>
+            <th>Faturado</th>
+            <th>Invest. Total</th>
+            <th>ROAS</th>
+            <th>Transações</th>
+            <th>Sessões</th>
+            <th>CPA</th>
+            <th>Ticket</th>
+          </tr>
+        </thead>
+        <tbody id="dailyBody"><tr><td colspan="11" class="loading">...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: LANÇAMENTO
+══════════════════════════════════════════════════ -->
+<div class="page" id="page-lancamento">
+  <div class="card">
+    <div class="card-title">✏️ Lançamento Diário</div>
+
+    <div class="form-group" style="max-width:200px; margin-bottom:20px;">
+      <label>Data</label>
+      <input type="date" id="entryDate" />
+    </div>
+
+    <div class="form-section-title">💰 Receita</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Receita Total</label>
+        <input type="number" id="f_receita_captada" step="0.01" min="0" placeholder="0,00" />
+      </div>
+    </div>
+
+    <div class="form-section-title">
+      💸 Investimento em Mídia
+      <button class="btn btn-success" style="margin-left:12px;padding:5px 14px;font-size:.78rem;" onclick="importMetaSpend()">
+        ⬇️ Importar do Meta Ads
+      </button>
+      <span id="metaImportStatus" style="font-size:.78rem;color:#64748b;margin-left:8px;"></span>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Conta 01 — BRL (Principal)</label>
+        <input type="number" id="f_invest_fb01" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Conta 02 — USD→BRL</label>
+        <input type="number" id="f_invest_fb03" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Conta 03 — USD→BRL (Reserva)</label>
+        <input type="number" id="f_invest_fb03b" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>
+          Google Ads
+          <button class="btn btn-success" style="margin-left:8px;padding:3px 10px;font-size:.72rem;" onclick="importGoogleAds()">⬇️ Importar</button>
+          <span id="gadsImportStatus" style="font-size:.72rem;color:#64748b;margin-left:6px;"></span>
+        </label>
+        <input type="number" id="f_invest_google" step="0.01" min="0" placeholder="0,00" />
+      </div>
+    </div>
+
+    <div class="form-section-title">
+      👟 Sessões & Transações (GA4)
+      <button class="btn btn-success" style="margin-left:12px;padding:5px 14px;font-size:.78rem;" onclick="importGA4Data()">
+        ⬇️ Importar do GA4
+      </button>
+      <span id="ga4ImportStatus" style="font-size:.78rem;color:#64748b;margin-left:8px;"></span>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Sessões Total</label>
+        <input type="number" id="f_sessoes_total" step="1" min="0" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label>Sessões Mídia (pagas)</label>
+        <input type="number" id="f_sessoes_midia" step="1" min="0" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label>Transações</label>
+        <input type="number" id="f_transacoes" step="1" min="0" placeholder="0" />
+      </div>
+    </div>
+
+    <div class="form-section-title">
+      📡 Receita por Canal (GA4)
+      <button class="btn btn-success" style="margin-left:12px;padding:5px 14px;font-size:.78rem;" onclick="importGA4Channels()">
+        ⬇️ Importar Canais do GA4
+      </button>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Direct</label>
+        <input type="number" id="f_receita_direct" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Organic</label>
+        <input type="number" id="f_receita_organic" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Edrone (Email/SMS/WA)</label>
+        <input type="number" id="f_receita_edrone" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Social / Referral</label>
+        <input type="number" id="f_receita_social" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>IG Shopping</label>
+        <input type="number" id="f_receita_ig_shopping" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Facebook (GA4)</label>
+        <input type="number" id="f_receita_facebook" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Google (GA4)</label>
+        <input type="number" id="f_receita_google_ga4" step="0.01" min="0" placeholder="0,00" />
+      </div>
+    </div>
+
+    <div class="form-section-title">📧 Edrone</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Custo Edrone (R$)</label>
+        <input type="number" id="f_custo_edrone" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group" style="grid-column: span 2;">
+        <label>Observações</label>
+        <input type="text" id="f_notas" placeholder="Observações do dia..." />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- KPIs calculados em tempo real -->
+    <div id="previewKpis" style="margin-bottom:20px; display:none;">
+      <div class="form-section-title">🔢 Preview dos KPIs (calculado automaticamente)</div>
+      <div class="kpi-grid" id="previewGrid"></div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveEntry()">💾 Salvar Lançamento</button>
+      <button class="btn btn-ghost" onclick="clearForm()">🗑 Limpar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: METAS
+══════════════════════════════════════════════════ -->
+<div class="page" id="page-metas">
+  <div class="card">
+    <div class="card-title">🎯 Metas do Mês — <span id="metaMonthLabel"></span></div>
+
+    <div class="form-section-title">💰 Receita</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Meta Receita Faturada</label>
+        <input type="number" id="g_meta_receita_faturada" step="0.01" min="0" placeholder="0,00" />
+      </div>
+      <div class="form-group">
+        <label>Meta Investimento Total</label>
+        <input type="number" id="g_meta_investimento" step="0.01" min="0" placeholder="0,00" />
+      </div>
+    </div>
+
+    <div class="form-section-title">📊 Volume</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Meta Sessões</label>
+        <input type="number" id="g_meta_sessoes" step="1" min="0" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label>Meta Transações (Pedidos)</label>
+        <input type="number" id="g_meta_transacoes" step="1" min="0" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label>Meta Ticket Médio</label>
+        <input type="number" id="g_meta_ticket_medio" step="0.01" min="0" placeholder="0,00" />
+      </div>
+    </div>
+
+    <div class="form-section-title">⚡ KPIs Alvo</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>ROAS Alvo</label>
+        <input type="number" id="g_meta_roas_captado" step="0.01" min="0" placeholder="ex: 6.5" />
+      </div>
+      <div class="form-group">
+        <label>CPA Alvo (R$)</label>
+        <input type="number" id="g_meta_cpa" step="0.01" min="0" placeholder="ex: 55,00" />
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div style="display:flex; gap:12px;">
+      <button class="btn btn-primary" onclick="saveGoals()">💾 Salvar Metas</button>
+      <button class="btn btn-ghost" onclick="loadGoals()">↩ Recarregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     PAGE: HISTÓRICO
+══════════════════════════════════════════════════ -->
+<div class="page" id="page-historico">
+  <div class="card">
+    <div class="card-title">📅 Histórico Mensal (últimos 6 meses)</div>
+    <div class="tbl-wrap">
+      <table id="histTable">
+        <thead>
+          <tr>
+            <th>Mês</th>
+            <th>Receita</th>
+            <th>Investimento</th>
+            <th>ROAS</th>
+            <th>CPA</th>
+            <th>Transações</th>
+          </tr>
+        </thead>
+        <tbody id="histBody"><tr><td colspan="8" class="loading">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// Quando servido pelo servidor estático (8765), aponta para o backend FastAPI (8000)
+const API = (window.location.port === '8765' || window.location.protocol === 'file:')
+  ? 'http://localhost:8000'
+  : '';
+let currentMonth = '';
+
+// ─── INIT ─────────────────────────────────────────
+(function init() {
+  const now = new Date();
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    months.push(ym);
+  }
+  const sel = document.getElementById('monthSelect');
+  months.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = fmtYearMonth(m);
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  currentMonth = months[0];
+  document.getElementById('metaMonthLabel').textContent = fmtYearMonth(currentMonth);
+
+  // Set today as default for entry date
+  const today = now.toISOString().split('T')[0];
+  document.getElementById('entryDate').value = today;
+  document.getElementById('entryDate').addEventListener('change', loadEntryForDate);
+
+  // Live preview KPIs on form change
+  document.querySelectorAll('#page-lancamento input[type=number]').forEach(el => {
+    el.addEventListener('input', updatePreviewKpis);
+  });
+
+  loadDashboard();
+  loadHistory();
+})();
+
+function changeMonth() {
+  currentMonth = document.getElementById('monthSelect').value;
+  document.getElementById('metaMonthLabel').textContent = fmtYearMonth(currentMonth);
+  loadDashboard();
+  if (document.getElementById('page-metas').classList.contains('active')) loadGoals();
+}
+
+// ─── NAV ──────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'metas') loadGoals();
+  if (name === 'historico') loadHistory();
+}
+
+// ─── DASHBOARD ────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const data = await apiFetch(`/api/marketing/dashboard/${currentMonth}`);
+    renderKpis(data);
+    renderMetas(data);
+    renderProj(data);
+    renderKpisEfic(data);
+    renderCanais(data);
+    renderDailyTable(data.daily || []);
+  } catch(e) {
+    console.error(e);
+    toast('Erro ao carregar dashboard', 'err');
+  }
+}
+
+function renderKpis(data) {
+  const k = data.kpis || {};
+  const g = data.goal || {};
+  const a = data.atingimento || {};
+
+  const cards = [
+    { label: 'Receita Total', value: fmtBRL(k.receita_captada), sub: `Meta: ${fmtBRL(g.meta_receita_faturada||g.meta_receita_captada||0)}`, pct: a.receita_captada, color: 'green' },
+    { label: 'Investimento Total', value: fmtBRL(k.invest_total), sub: `FB: ${fmtBRL((k.invest_fb01||0)+(k.invest_fb02||0)+(k.invest_fb03||0))} | Goog: ${fmtBRL(k.invest_google||0)} | Edrone: ${fmtBRL(k.custo_edrone||0)}`, color: 'orange' },
+    { label: 'ROAS', value: fmtNum(k.roas_captado, 2) + 'x', sub: `Meta: ${fmtNum(g.meta_roas_captado||0,2)}x`, color: k.roas_captado >= (g.meta_roas_captado||4) ? 'green' : 'red' },
+    { label: 'CPA', value: fmtBRL(k.cpa), sub: `Meta: ${fmtBRL(g.meta_cpa||0)}`, color: (g.meta_cpa && k.cpa <= g.meta_cpa) ? 'green' : 'orange' },
+    { label: 'Transações', value: fmtInt(k.transacoes), sub: `Meta: ${fmtInt(g.meta_transacoes||0)}`, pct: a.transacoes, color: 'purple' },
+  ];
+
+  document.getElementById('kpiGrid').innerHTML = cards.map(c => `
+    <div class="kpi-card ${c.color}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}
+        ${c.pct != null ? `<span class="kpi-badge ${badgeColor(c.pct)}">${fmtNum(c.pct,1)}%</span>` : ''}
+      </div>
+      <div class="kpi-sub">${c.sub||''}</div>
+      ${c.pct != null ? `<div class="progress-bar"><div class="progress-fill ${c.pct>=100?'over':c.pct<60?'warn':''}" style="width:${Math.min(c.pct,100)}%"></div></div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderMetas(data) {
+  const k = data.kpis || {};
+  const g = data.goal || {};
+  const a = data.atingimento || {};
+  const pa = data.proj_ating || {};
+
+  const rows = [
+    { label: 'Receita Total', atual: k.receita_captada, meta: g.meta_receita_faturada || g.meta_receita_captada, pct: a.receita_captada },
+    { label: 'Investimento', atual: k.invest_total, meta: g.meta_investimento, pct: a.invest_total },
+    { label: 'Transações', atual: k.transacoes, meta: g.meta_transacoes, pct: a.transacoes, isMoney: false },
+  ];
+
+  document.getElementById('metasProgress').innerHTML = rows.map(r => {
+    const pct = r.pct || 0;
+    const meta = r.meta || 0;
+    const fillClass = pct >= 100 ? 'over' : pct < 50 ? 'warn' : '';
+    const fVal = r.isMoney === false ? fmtInt(r.atual) : fmtBRL(r.atual);
+    const fMeta = r.isMoney === false ? fmtInt(meta) : fmtBRL(meta);
+    return `
+      <div class="prog-row">
+        <span class="prog-label">${r.label}</span>
+        <div class="prog-wrap">
+          <div class="prog-nums"><span>${fVal}</span><span>${fMeta}</span></div>
+          <div class="progress-bar"><div class="progress-fill ${fillClass}" style="width:${Math.min(pct,100)}%"></div></div>
+        </div>
+        <span class="prog-pct">${fmtNum(pct,1)}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderProj(data) {
+  const p = data.projection || {};
+  const g = data.goal || {};
+  const pa = data.proj_ating || {};
+  const drem = data.days_remaining || 0;
+
+  const items = [
+    { lbl: 'Rec. Captada', val: fmtBRL(p.receita_captada), pct: pa.receita_captada },
+    { lbl: 'Rec. Faturada', val: fmtBRL(p.receita_faturada), pct: pa.receita_faturada },
+    { lbl: 'Investimento', val: fmtBRL(p.invest_total), pct: null },
+  ];
+
+  const info = `<div style="font-size:.78rem;color:#94a3b8;text-align:center;margin-bottom:14px;">${drem} dias restantes no mês · pace atual</div>`;
+
+  document.getElementById('projGrid').innerHTML = info + items.map(i => `
+    <div class="proj-item">
+      <div class="lbl">${i.lbl}</div>
+      <div class="val">${i.val}</div>
+      ${i.pct != null ? `<div class="pct" style="color:${i.pct>=100?'#059669':i.pct<70?'#dc2626':'#d97706'}">${fmtNum(i.pct,1)}% da meta</div>` : ''}
+    </div>
+  `).join('');
+}
+
+function renderKpisEfic(data) {
+  const k = data.kpis || {};
+  const g = data.goal || {};
+  const cards = [
+    { label: 'Ticket Médio', value: fmtBRL(k.ticket_medio), sub: `Meta: ${fmtBRL(g.meta_ticket_medio||0)}`, color: 'teal' },
+    { label: 'Taxa de Conversão', value: fmtNum(k.taxa_conversao,2)+'%', sub: '', color: 'purple' },
+    { label: 'CPS Geral', value: fmtBRL(k.cps_geral), sub: 'Custo por Sessão', color: 'orange' },
+    { label: 'CPS Mídia', value: fmtBRL(k.cps_midia), sub: 'Custo por Sessão Paga', color: 'orange' },
+    { label: '% Sessões Mídia', value: fmtNum(k.pct_sessoes_midia,1)+'%', sub: `${fmtInt(k.sessoes_midia)} de ${fmtInt(k.sessoes_total)}`, color: 'teal' },
+  ];
+  document.getElementById('kpiEfic').innerHTML = cards.map(c => `
+    <div class="kpi-card ${c.color}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      <div class="kpi-sub">${c.sub}</div>
+    </div>
+  `).join('');
+}
+
+function renderCanais(data) {
+  const k = data.kpis || {};
+  const canais = k.canais || {};
+  const total = k.receita_captada || 1;
+
+  const colors = {
+    facebook: '#1877f2', google_ga4: '#ea4335', direct: '#10b981',
+    organic: '#8b5cf6', edrone: '#f59e0b',
+    social: '#ec4899', ig_shopping: '#f97316',
+  };
+  const labels = {
+    facebook: 'Facebook', google_ga4: 'Google', direct: 'Direct',
+    organic: 'Organic', edrone: 'Edrone',
+    social: 'Social/Referral', ig_shopping: 'IG Shopping',
+  };
+  const excluded = new Set(['cartstack', 'whatsapp']);
+
+  const sorted = Object.entries(canais)
+    .filter(([k]) => !excluded.has(k))
+    .map(([k, v]) => ({ key: k, val: v, pct: v / total * 100 }))
+    .sort((a, b) => b.val - a.val);
+
+  const maxVal = sorted[0]?.val || 1;
+
+  document.getElementById('channelList').innerHTML = sorted.map(c => `
+    <div class="channel-row">
+      <div class="channel-dot" style="background:${colors[c.key]||'#94a3b8'}"></div>
+      <div class="channel-name">${labels[c.key]||c.key}</div>
+      <div class="channel-bar-wrap">
+        <div class="channel-bar" style="width:${Math.max(c.val/maxVal*100,1)}%;background:${colors[c.key]||'#94a3b8'}"></div>
+      </div>
+      <div class="channel-val">${fmtBRL(c.val)}</div>
+      <div class="channel-pct">${fmtNum(c.pct,1)}%</div>
+    </div>
+  `).join('');
+
+  // Invest
+  const invItems = [
+    { key: 'fb01', label: 'Facebook 01 (BRL)', val: k.invest_fb01 || 0, color: '#1877f2' },
+    { key: 'fb02', label: 'Facebook 02 (USD)', val: k.invest_fb02 || 0, color: '#42a5f5' },
+    { key: 'fb03', label: 'Facebook 03 (USD)', val: k.invest_fb03 || 0, color: '#1565c0' },
+    { key: 'google', label: 'Google Ads', val: k.invest_google || 0, color: '#ea4335' },
+    { key: 'edrone', label: 'Edrone (WhatsApp/SMS)', val: k.custo_edrone || 0, color: '#f59e0b' },
+  ];
+  const maxInv = Math.max(...invItems.map(i => i.val), 1);
+  const totalInv = k.invest_total || 1;
+  document.getElementById('investList').innerHTML = invItems.map(i => `
+    <div class="channel-row">
+      <div class="channel-dot" style="background:${i.color}"></div>
+      <div class="channel-name">${i.label}</div>
+      <div class="channel-bar-wrap">
+        <div class="channel-bar" style="width:${Math.max(i.val/maxInv*100,1)}%;background:${i.color}"></div>
+      </div>
+      <div class="channel-val">${fmtBRL(i.val)}</div>
+      <div class="channel-pct">${fmtNum(i.val/totalInv*100,1)}%</div>
+    </div>
+  `).join('');
+}
+
+function renderDailyTable(rows) {
+  const today = new Date().toISOString().split('T')[0];
+  if (!rows.length) {
+    document.getElementById('dailyBody').innerHTML = '<tr><td colspan="10" style="text-align:center;color:#94a3b8;padding:24px;">Nenhum lançamento neste mês</td></tr>';
+    return;
+  }
+  document.getElementById('dailyBody').innerHTML = [...rows].sort((a,b) => a.date.localeCompare(b.date)).map(r => {
+    const invest = r.invest_fb01 + (r.invest_fb02 || 0) + r.invest_fb03 + r.invest_google + (r.custo_edrone || 0);
+    const fat = r.receita_plataforma + r.receita_whatsapp;
+    const roas_c = invest ? (r.receita_captada / invest) : 0;
+    const roas_f = invest ? (fat / invest) : 0;
+    const cpa = r.transacoes ? (invest / r.transacoes) : 0;
+    const ticket = r.transacoes ? (r.receita_captada / r.transacoes) : 0;
+    const aprov = r.receita_captada ? (fat / r.receita_captada * 100) : 0;
+    const isToday = r.date === today;
+    return `
+      <tr class="${isToday ? 'today-row' : ''}" onclick="loadDateInForm('${r.date}')" style="cursor:pointer" title="Clique para editar">
+        <td>${fmtDate(r.date)}</td>
+        <td>${fmtBRL(r.receita_captada)}</td>
+        <td>${fmtBRL(fat)}</td>
+        <td>${fmtBRL(invest)}</td>
+        <td class="${roas_c>=4?'num-green':roas_c<3?'num-red':''}">${fmtNum(roas_c,2)}x</td>
+        <td>${fmtInt(r.transacoes)}</td>
+        <td>${fmtInt(r.sessoes_total)}</td>
+        <td>${fmtBRL(cpa)}</td>
+        <td>${fmtBRL(ticket)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ─── LANÇAMENTO ───────────────────────────────────
+async function importMetaSpend() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) { toast('Selecione a data primeiro', 'err'); return; }
+  const statusEl = document.getElementById('metaImportStatus');
+  statusEl.textContent = 'Buscando...';
+  try {
+    const data = await apiFetch(`/api/meta/spend-by-date/${dt}`);
+    const acc = data.accounts || {};
+    const brl  = acc.brl?.spend_brl  || 0;
+    const usd2 = acc.usd2?.spend_brl || 0;
+    const usd3 = acc.usd3?.spend_brl || 0;
+    if (!data.total_brl) {
+      statusEl.textContent = 'Sem dados para esta data no Meta';
+      toast('Meta Ads sem dados para ' + dt, 'err');
+      return;
+    }
+    document.getElementById('f_invest_fb01').value  = brl.toFixed(2);
+    document.getElementById('f_invest_fb03').value  = usd2.toFixed(2);
+    document.getElementById('f_invest_fb03b').value = usd3.toFixed(2);
+    statusEl.textContent = `✅ Total: ${fmtBRL(data.total_brl)} · C01: ${fmtBRL(brl)} · C02: ${fmtBRL(usd2)} · C03: ${fmtBRL(usd3)}`;
+    updatePreviewKpis();
+    toast('Investimento Meta importado!', 'ok');
+  } catch(e) {
+    statusEl.textContent = 'Erro ao importar';
+    toast('Erro ao buscar Meta Ads', 'err');
+  }
+}
+
+async function importGA4Data() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) { toast('Selecione a data primeiro', 'err'); return; }
+  const statusEl = document.getElementById('ga4ImportStatus');
+  statusEl.textContent = 'Buscando...';
+  try {
+    const data = await apiFetch(`/api/analytics/daily?date=${dt}`);
+    if (data.sessions !== undefined) {
+      document.getElementById('f_sessoes_total').value = data.sessions || 0;
+      document.getElementById('f_sessoes_midia').value = data.sessions_paid || 0;
+      document.getElementById('f_transacoes').value = data.transactions || 0;
+      if (data.revenue) document.getElementById('f_receita_captada').value = data.revenue.toFixed(2);
+      statusEl.textContent = `✅ ${fmtInt(data.sessions)} sessões · ${fmtInt(data.transactions)} transações`;
+      updatePreviewKpis();
+      toast('GA4 importado!', 'ok');
+    } else {
+      statusEl.textContent = 'Sem dados GA4 para esta data';
+      toast('GA4 sem dados para ' + dt, 'err');
+    }
+  } catch(e) {
+    statusEl.textContent = '⚠️ GA4 não configurado';
+    toast('Configure as credenciais do GA4 primeiro', 'err');
+  }
+}
+
+async function importGA4Channels() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) { toast('Selecione a data primeiro', 'err'); return; }
+  try {
+    const data = await apiFetch(`/api/analytics/channels?date=${dt}`);
+    if (data && data.mapped) {
+      const m = data.mapped;
+      const rev = key => ((m[key] && m[key].revenue) || 0).toFixed(2);
+      const ses = key => ((m[key] && m[key].sessions) || 0);
+      document.getElementById('f_receita_direct').value      = rev('direct');
+      document.getElementById('f_receita_organic').value     = rev('organic');
+      document.getElementById('f_receita_edrone').value      = rev('edrone');
+      document.getElementById('f_receita_social').value      = rev('social');
+      document.getElementById('f_receita_facebook').value    = rev('facebook');
+      document.getElementById('f_receita_google_ga4').value  = rev('google_ga4');
+      // sessões mídia = paid social + google
+      const sessoesMidia = ses('facebook') + ses('google_ga4');
+      if (sessoesMidia > 0) document.getElementById('f_sessoes_midia').value = sessoesMidia;
+      updatePreviewKpis();
+      toast('Canais GA4 importados!', 'ok');
+    }
+  } catch(e) {
+    toast('Configure as credenciais do GA4 primeiro', 'err');
+  }
+}
+
+async function importGoogleAds() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) { toast('Selecione a data primeiro', 'err'); return; }
+  const statusEl = document.getElementById('gadsImportStatus');
+  statusEl.textContent = 'Buscando...';
+  try {
+    const data = await apiFetch(`/api/analytics/googleads-cost?date=${dt}`);
+    if (data && data.spend_brl !== undefined) {
+      document.getElementById('f_invest_google').value = data.spend_brl.toFixed(2);
+      statusEl.textContent = `✅ ${fmtBRL(data.spend_brl)}`;
+      updatePreviewKpis();
+      toast('Google Ads importado!', 'ok');
+    }
+  } catch(e) {
+    statusEl.textContent = '⚠️ Não configurado';
+    toast('Configure as credenciais do Google Ads primeiro', 'err');
+  }
+}
+
+async function loadEntryForDate() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) return;
+  try {
+    const data = await apiFetch(`/api/marketing/daily/${dt}`);
+    if (data && data.date) fillForm(data);
+    else clearNumericFields();
+    updatePreviewKpis();
+  } catch(e) {
+    toast('Erro ao carregar lançamento', 'err');
+  }
+}
+
+async function loadDateInForm(dt) {
+  showPage('lancamento');
+  document.querySelectorAll('.nav-tab').forEach((t, i) => t.classList.toggle('active', i===1));
+  document.getElementById('entryDate').value = dt;
+  await loadEntryForDate();
+}
+
+function fillForm(d) {
+  const fields = ['receita_captada','receita_plataforma','receita_whatsapp',
+    'invest_fb01','invest_google',
+    'sessoes_total','sessoes_midia','transacoes',
+    'receita_direct','receita_organic','receita_edrone',
+    'receita_cartstack','receita_social','receita_ig_shopping',
+    'receita_facebook','receita_google_ga4','custo_edrone'];
+  fields.forEach(f => {
+    const el = document.getElementById('f_' + f);
+    if (el) el.value = d[f] || '';
+  });
+  // f_invest_fb03 = Conta 02 (invest_fb02 no banco)
+  // f_invest_fb03b = Conta 03 (invest_fb03 no banco)
+  document.getElementById('f_invest_fb03').value  = d.invest_fb02 || '';
+  document.getElementById('f_invest_fb03b').value = d.invest_fb03 || '';
+  document.getElementById('f_notas').value = d.notas || '';
+}
+
+function clearNumericFields() {
+  document.querySelectorAll('#page-lancamento input[type=number]').forEach(el => el.value = '');
+  document.getElementById('f_notas').value = '';
+}
+
+function clearForm() {
+  clearNumericFields();
+  document.getElementById('entryDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('previewKpis').style.display = 'none';
+}
+
+function fVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+
+function updatePreviewKpis() {
+  const rc = fVal('f_receita_captada');
+  const rp = fVal('f_receita_plataforma');
+  const rw = fVal('f_receita_whatsapp');
+  const invest = fVal('f_invest_fb01') + fVal('f_invest_fb03') + fVal('f_invest_fb03b') + fVal('f_invest_google') + fVal('f_custo_edrone');
+  const trx = fVal('f_transacoes') || 0;
+  const sess = fVal('f_sessoes_total') || 0;
+  const fat = rp + rw;
+
+  if (!rc && !invest) { document.getElementById('previewKpis').style.display = 'none'; return; }
+  document.getElementById('previewKpis').style.display = 'block';
+
+  const cards = [
+    { label: 'ROAS', value: invest ? fmtNum(rc/invest,2)+'x' : '—', color: 'green' },
+    { label: 'CPA', value: (invest && trx) ? fmtBRL(invest/trx) : '—', color: 'orange' },
+    { label: 'Ticket Médio', value: (rc && trx) ? fmtBRL(rc/trx) : '—', color: 'teal' },
+    { label: 'CPS Geral', value: (invest && sess) ? fmtBRL(invest/sess) : '—', color: 'blue' },
+  ];
+  document.getElementById('previewGrid').innerHTML = cards.map(c => `
+    <div class="kpi-card ${c.color}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+    </div>
+  `).join('');
+}
+
+async function saveEntry() {
+  const dt = document.getElementById('entryDate').value;
+  if (!dt) { toast('Selecione a data', 'err'); return; }
+
+  const payload = {
+    date: dt,
+    receita_captada: fVal('f_receita_captada'),
+    receita_plataforma: fVal('f_receita_plataforma'),
+    receita_whatsapp: fVal('f_receita_whatsapp'),
+    invest_fb01: fVal('f_invest_fb01'),
+    invest_fb02: fVal('f_invest_fb03'),
+    invest_fb03: fVal('f_invest_fb03b'),
+    invest_google: fVal('f_invest_google'),
+    sessoes_total: fVal('f_sessoes_total'),
+    sessoes_midia: fVal('f_sessoes_midia'),
+    transacoes: fVal('f_transacoes'),
+    receita_direct: fVal('f_receita_direct'),
+    receita_organic: fVal('f_receita_organic'),
+    receita_edrone: fVal('f_receita_edrone'),
+    receita_cartstack: fVal('f_receita_cartstack'),
+    receita_social: fVal('f_receita_social'),
+    receita_ig_shopping: fVal('f_receita_ig_shopping'),
+    receita_facebook: fVal('f_receita_facebook'),
+    receita_google_ga4: fVal('f_receita_google_ga4'),
+    custo_edrone: fVal('f_custo_edrone'),
+    notas: document.getElementById('f_notas').value,
+  };
+
+  try {
+    await apiFetch('/api/marketing/daily', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Lançamento salvo!', 'ok');
+    // Refresh dashboard if same month
+    const ym = dt.substring(0, 7);
+    if (ym === currentMonth) loadDashboard();
+  } catch(e) {
+    toast('Erro ao salvar', 'err');
+  }
+}
+
+// ─── METAS ────────────────────────────────────────
+async function loadGoals() {
+  let data;
+  try {
+    data = await apiFetch(`/api/marketing/goals/${currentMonth}`);
+  } catch(e) {
+    toast('Erro ao carregar metas', 'err');
+    return;
+  }
+  if (!data) return;
+  const fields = ['meta_receita_captada','meta_receita_faturada','meta_investimento',
+    'meta_sessoes','meta_transacoes','meta_ticket_medio',
+    'meta_roas_captado','meta_roas_faturado','meta_cpa'];
+  fields.forEach(f => {
+    const el = document.getElementById('g_' + f);
+    if (el && data[f]) el.value = data[f];
+  });
+}
+
+async function saveGoals() {
+  const payload = {
+    year_month: currentMonth,
+    meta_receita_captada: fVal('g_meta_receita_captada'),
+    meta_receita_faturada: fVal('g_meta_receita_faturada'),
+    meta_investimento: fVal('g_meta_investimento'),
+    meta_sessoes: fVal('g_meta_sessoes'),
+    meta_transacoes: fVal('g_meta_transacoes'),
+    meta_ticket_medio: fVal('g_meta_ticket_medio'),
+    meta_roas_captado: fVal('g_meta_roas_captado'),
+    meta_roas_faturado: fVal('g_meta_roas_faturado'),
+    meta_cpa: fVal('g_meta_cpa'),
+  };
+  try {
+    await apiFetch('/api/marketing/goals', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Metas salvas!', 'ok');
+    loadDashboard();
+  } catch(e) {
+    toast('Erro ao salvar metas', 'err');
+  }
+}
+
+// ─── HISTÓRICO ────────────────────────────────────
+async function loadHistory() {
+  let rows;
+  try {
+    rows = await apiFetch('/api/marketing/history?months=6');
+  } catch(e) {
+    toast('Erro ao carregar histórico', 'err');
+    return;
+  }
+  if (!rows || !rows.length) return;
+  document.getElementById('histBody').innerHTML = rows.map(r => `
+    <tr>
+      <td><strong>${fmtYearMonth(r.year_month)}</strong></td>
+      <td>${fmtBRL(r.receita_captada)}</td>
+      <td>${fmtBRL(r.invest_total)}</td>
+      <td class="${r.roas_captado>=4?'num-green':r.roas_captado>0&&r.roas_captado<3?'num-red':''}">${r.roas_captado ? fmtNum(r.roas_captado,2)+'x' : '—'}</td>
+      <td>${r.cpa ? fmtBRL(r.cpa) : '—'}</td>
+      <td>${fmtInt(r.transacoes)}</td>
+    </tr>
+  `).join('');
+}
+
+// ─── BACKUP ───────────────────────────────────────
+async function makeBackup() {
+  try {
+    const data = await apiFetch('/api/marketing/backup', { method: 'POST' });
+    toast(`✅ Backup salvo: ${data.arquivo}`, 'ok');
+  } catch(e) {
+    toast('Erro ao fazer backup', 'err');
+  }
+}
+
+// ─── UTILS ────────────────────────────────────────
+async function apiFetch(url, opts = {}) {
+  const defaults = { headers: { 'Content-Type': 'application/json' } };
+  const res = await fetch(API + url, { ...defaults, ...opts });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+function fmtBRL(v) {
+  if (!v && v !== 0) return '—';
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtNum(v, dec=2) {
+  if (!v && v !== 0) return '—';
+  return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function fmtInt(v) {
+  if (!v && v !== 0) return '—';
+  return Number(v).toLocaleString('pt-BR');
+}
+function fmtDate(s) {
+  if (!s) return '';
+  const [y, m, d] = s.split('-');
+  return `${d}/${m}`;
+}
+function fmtYearMonth(ym) {
+  const months = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const [y, m] = ym.split('-');
+  return `${months[parseInt(m)-1]}/${y}`;
+}
+function badgeColor(pct) {
+  if (!pct) return 'badge-orange';
+  if (pct >= 100) return 'badge-green';
+  if (pct < 60) return 'badge-red';
+  return 'badge-orange';
+}
+
+let toastTimer;
+function toast(msg, type='ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>
