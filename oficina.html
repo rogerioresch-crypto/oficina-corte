@@ -5038,17 +5038,17 @@ function verificarSessao() {
 }
 
 function fazerLogin() {
-  const u = document.getElementById('login-usuario').value.trim();
+  const u = document.getElementById('login-usuario').value.trim().toLowerCase();
   const s = document.getElementById('login-senha').value;
   const erroEl = document.getElementById('login-erro');
   erroEl.style.display = 'none';
   if (!u || !s) { erroEl.textContent = 'Preencha usuário e senha.'; erroEl.style.display = ''; return; }
 
-  // Busca usuário no localStorage com hash FNV
+  // Busca usuário no localStorage com hash FNV (usuario case-insensitive)
   const hash = hashSenha(s);
   let arr = [];
   try { arr = JSON.parse(localStorage.getItem('oc_usuarios') || '[]'); } catch(e) {}
-  const userObj = arr.find(x => x.usuario === u && x.senha_hash === hash && x.ativo !== false) || null;
+  const userObj = arr.find(x => (x.usuario||'').toLowerCase() === u && x.senha_hash === hash && x.ativo !== false) || null;
 
   if (!userObj) { erroEl.textContent = 'Usuário ou senha incorretos.'; erroEl.style.display = ''; return; }
 
