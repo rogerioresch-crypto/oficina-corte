@@ -1550,20 +1550,38 @@
           <select id="envio-acab-lavanderia"></select>
         </div>
         <div class="form-group">
-          <label>Qtd Enviada *</label>
-          <input type="number" id="envio-acab-qtd-enviada" min="0" placeholder="Ex: 50">
-        </div>
-        <div class="form-group">
           <label>Preço Unit. (R$)</label>
           <input type="number" id="envio-acab-preco-unit" min="0" step="0.01" placeholder="Ex: 15,00">
         </div>
         <div class="form-group">
-          <label>Qtd Retornada</label>
-          <input type="number" id="envio-acab-qtd-retornada" min="0" placeholder="Preencher no retorno">
-        </div>
-        <div class="form-group">
           <label>Data do Retorno</label>
           <input type="date" id="envio-acab-data-retorno">
+        </div>
+        <!-- Grade de Cores Enviadas -->
+        <div style="grid-column:1/-1">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <label style="margin:0;font-weight:600">Cores Enviadas *</label>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addCorEnvio()">+ Cor</button>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:.85rem" id="table-cores-envio">
+            <thead>
+              <tr style="background:#f8fafc">
+                <th style="padding:6px 8px;text-align:left;border-bottom:1px solid #e2e8f0">Cor</th>
+                <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #e2e8f0;width:100px">Qtd Enviada</th>
+                <th style="padding:6px 8px;text-align:right;border-bottom:1px solid #e2e8f0;width:110px">Qtd Retornada</th>
+                <th style="padding:6px 8px;width:36px;border-bottom:1px solid #e2e8f0"></th>
+              </tr>
+            </thead>
+            <tbody id="tbody-cores-envio"></tbody>
+            <tfoot>
+              <tr style="background:#f1f5f9;font-weight:700">
+                <td style="padding:6px 8px">Total</td>
+                <td style="padding:6px 8px;text-align:right" id="total-qtd-enviada">0</td>
+                <td style="padding:6px 8px;text-align:right" id="total-qtd-retornada">0</td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>Observação</label>
@@ -6156,12 +6174,19 @@ const TIPOS_ACABAMENTO_LABELS = {
   'Hotfix':  '✨ Hotfix',
 };
 
-function _statusAcabamento(e) {
-  const ret = Number(e.qtd_retornada) || 0;
-  const env = Number(e.qtd_enviada)   || 0;
-  if (!ret)          return { label: 'Aguardando', color: '#f59e0b', bg: '#fffbeb' };
-  if (ret < env)     return { label: 'Parcial',    color: '#3b82f6', bg: '#eff6ff' };
-  return               { label: 'Concluído',  color: '#10b981', bg: '#ecfdf5' };
+
+function _coresEnvioTotais(e) {
+  const cores = e.cores || [];
+  const env = cores.reduce((s,c) => s + (Number(c.qtd_enviada)||0), 0);
+  const ret = cores.reduce((s,c) => s + (Number(c.qtd_retornada)||0), 0);
+  return { env, ret };
+}
+
+function _statusAcabamentoV2(e) {
+  const { env, ret } = _coresEnvioTotais(e);
+  if (!ret)      return { label: 'Aguardando', color: '#f59e0b', bg: '#fffbeb' };
+  if (ret < env) return { label: 'Parcial',    color: '#3b82f6', bg: '#eff6ff' };
+  return           { label: 'Concluído',  color: '#10b981', bg: '#ecfdf5' };
 }
 
 function renderEnviosAcabamento() {
@@ -6171,12 +6196,12 @@ function renderEnviosAcabamento() {
   // Cards resumo
   const resumoEl = document.getElementById('acabamento-resumo');
   if (resumoEl) {
-    const total     = enviosAcabamento.length;
-    const aguardando = enviosAcabamento.filter(e => !Number(e.qtd_retornada)).length;
-    const parcial    = enviosAcabamento.filter(e => { const r=Number(e.qtd_retornada)||0; return r>0 && r<Number(e.qtd_enviada); }).length;
-    const concluido  = enviosAcabamento.filter(e => { const r=Number(e.qtd_retornada)||0; return r>=Number(e.qtd_enviada)&&r>0; }).length;
-    const totalPecas = enviosAcabamento.reduce((s,e) => s + (Number(e.qtd_enviada)||0), 0);
-    const totalValor = enviosAcabamento.reduce((s,e) => s + ((Number(e.qtd_enviada)||0)*(Number(e.preco_unit)||0)), 0);
+    const total      = enviosAcabamento.length;
+    const aguardando = enviosAcabamento.filter(e => _statusAcabamentoV2(e).label === 'Aguardando').length;
+    const parcial    = enviosAcabamento.filter(e => _statusAcabamentoV2(e).label === 'Parcial').length;
+    const concluido  = enviosAcabamento.filter(e => _statusAcabamentoV2(e).label === 'Concluído').length;
+    const totalPecas = enviosAcabamento.reduce((s,e) => s + _coresEnvioTotais(e).env, 0);
+    const totalValor = enviosAcabamento.reduce((s,e) => s + _coresEnvioTotais(e).env * (Number(e.preco_unit)||0), 0);
     resumoEl.innerHTML = [
       ['Total de Envios', total, '#2563eb'],
       ['Aguardando', aguardando, '#f59e0b'],
@@ -6198,91 +6223,146 @@ function renderEnviosAcabamento() {
   const sorted = enviosAcabamento.slice().sort((a,b) => (b.data_envio||'').localeCompare(a.data_envio||''));
   const canEdit = usuarioLogado?.role !== 'oficina';
   tbody.innerHTML = sorted.map(e => {
-    const lav    = lavanderiasEmp.find(l => l.id === e.lavanderia_id);
-    const st     = _statusAcabamento(e);
-    const total  = ((Number(e.qtd_enviada)||0) * (Number(e.preco_unit)||0));
+    const lav  = lavanderiasEmp.find(l => l.id === e.lavanderia_id);
+    const st   = _statusAcabamentoV2(e);
+    const { env, ret } = _coresEnvioTotais(e);
+    const total = env * (Number(e.preco_unit)||0);
     const fmtBRL = v => v > 0 ? 'R$ ' + v.toLocaleString('pt-BR',{minimumFractionDigits:2}) : '—';
+    const coresHtml = (e.cores||[]).map(c =>
+      `<div style="font-size:.78rem;color:#475569"><span style="font-weight:600">${c.cor}</span>: env ${c.qtd_enviada||0}${c.qtd_retornada ? ` / ret ${c.qtd_retornada}` : ''}</div>`
+    ).join('');
     return `<tr>
       <td>${e.data_envio ? new Date(e.data_envio+'T12:00').toLocaleDateString('pt-BR') : '—'}</td>
       <td class="font-bold">${e.referencia||'—'}</td>
       <td>${lav?.nome||'—'}</td>
       <td><span style="background:#f1f5f9;padding:2px 8px;border-radius:12px;font-size:.8rem;font-weight:600">${TIPOS_ACABAMENTO_LABELS[e.tipo_acabamento]||e.tipo_acabamento||'—'}</span></td>
-      <td style="text-align:right;font-weight:600">${e.qtd_enviada||0}</td>
+      <td style="text-align:right;font-weight:600">${env}</td>
       <td style="text-align:right">${fmtBRL(Number(e.preco_unit)||0)}</td>
       <td style="text-align:right;font-weight:600">${fmtBRL(total)}</td>
-      <td style="text-align:right">${e.qtd_retornada||'—'}</td>
+      <td style="text-align:right">${ret||'—'}</td>
       <td>${e.data_retorno ? new Date(e.data_retorno+'T12:00').toLocaleDateString('pt-BR') : '—'}</td>
       <td><span style="background:${st.bg};color:${st.color};padding:2px 10px;border-radius:12px;font-size:.78rem;font-weight:700">${st.label}</span></td>
       <td><div class="actions-cell">
         ${canEdit ? `<button class="btn btn-secondary btn-sm" onclick="editEnvioAcabamento('${e.id}')">Editar</button>` : ''}
         ${canEdit ? `<button class="btn btn-danger btn-sm" onclick="deleteEnvioAcabamento('${e.id}')">✕</button>` : ''}
       </div></td>
+    </tr>
+    <tr style="background:#fafafa">
+      <td colspan="11" style="padding:4px 12px 8px 12px">${coresHtml||'<span style="font-size:.78rem;color:#94a3b8">Sem cores cadastradas</span>'}</td>
     </tr>`;
   }).join('');
 }
 
+function _renderCoresEnvioTabela(cores) {
+  const tbody = document.getElementById('tbody-cores-envio');
+  tbody.innerHTML = cores.map((c, i) => `
+    <tr>
+      <td style="padding:4px 6px"><input type="text" value="${c.cor||''}" placeholder="Ex: Preto, Branco…"
+        oninput="coresEnvioTemp[${i}].cor=this.value"
+        style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem"></td>
+      <td style="padding:4px 6px"><input type="number" value="${c.qtd_enviada||''}" min="0" placeholder="0"
+        oninput="coresEnvioTemp[${i}].qtd_enviada=Number(this.value)||0;_atualizarTotaisCores()"
+        style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem;text-align:right"></td>
+      <td style="padding:4px 6px"><input type="number" value="${c.qtd_retornada||''}" min="0" placeholder="0"
+        oninput="coresEnvioTemp[${i}].qtd_retornada=Number(this.value)||0;_atualizarTotaisCores()"
+        style="width:100%;border:1px solid #e2e8f0;border-radius:6px;padding:5px 8px;font-size:.85rem;text-align:right"></td>
+      <td style="padding:4px 6px;text-align:center">
+        <button type="button" onclick="removeCorEnvio(${i})" style="background:none;border:none;color:#ef4444;font-size:1rem;cursor:pointer;padding:2px 4px">✕</button>
+      </td>
+    </tr>`).join('');
+  _atualizarTotaisCores();
+}
+
+function _atualizarTotaisCores() {
+  document.getElementById('total-qtd-enviada').textContent   = coresEnvioTemp.reduce((s,c)=>s+(Number(c.qtd_enviada)||0),0);
+  document.getElementById('total-qtd-retornada').textContent = coresEnvioTemp.reduce((s,c)=>s+(Number(c.qtd_retornada)||0),0);
+}
+
+let coresEnvioTemp = [];
+
+function addCorEnvio() {
+  coresEnvioTemp.push({ cor: '', qtd_enviada: 0, qtd_retornada: 0 });
+  _renderCoresEnvioTabela(coresEnvioTemp);
+}
+
+function removeCorEnvio(i) {
+  coresEnvioTemp.splice(i, 1);
+  _renderCoresEnvioTabela(coresEnvioTemp);
+}
+
 function openEnvioAcabamentoModal(id) {
-  // Preenche select de lavanderias
   const selLav = document.getElementById('envio-acab-lavanderia');
   selLav.innerHTML = '<option value="">Selecione…</option>' +
     lavanderiasEmp.map(l => `<option value="${l.id}">${l.nome}</option>`).join('');
 
-  // Reset
-  document.getElementById('envio-acab-id').value            = '';
-  document.getElementById('envio-acab-data-envio').value     = new Date().toISOString().slice(0,10);
-  document.getElementById('envio-acab-tipo').value           = '';
-  document.getElementById('envio-acab-referencia').value     = '';
-  selLav.value                                               = '';
-  document.getElementById('envio-acab-qtd-enviada').value    = '';
-  document.getElementById('envio-acab-preco-unit').value     = '';
-  document.getElementById('envio-acab-qtd-retornada').value  = '';
-  document.getElementById('envio-acab-data-retorno').value   = '';
-  document.getElementById('envio-acab-obs').value            = '';
+  document.getElementById('envio-acab-id').value         = '';
+  document.getElementById('envio-acab-data-envio').value  = new Date().toISOString().slice(0,10);
+  document.getElementById('envio-acab-tipo').value        = '';
+  document.getElementById('envio-acab-referencia').value  = '';
+  selLav.value                                            = '';
+  document.getElementById('envio-acab-preco-unit').value  = '';
+  document.getElementById('envio-acab-data-retorno').value = '';
+  document.getElementById('envio-acab-obs').value         = '';
   document.getElementById('modal-envio-acab-title').textContent = '🎨 Novo Envio de Acabamento';
+
+  coresEnvioTemp = [{ cor: '', qtd_enviada: 0, qtd_retornada: 0 }];
 
   if (id) {
     const e = enviosAcabamento.find(x => x.id === id);
     if (!e) return;
     document.getElementById('modal-envio-acab-title').textContent = '🎨 Editar Envio de Acabamento';
-    document.getElementById('envio-acab-id').value            = e.id;
-    document.getElementById('envio-acab-data-envio').value    = e.data_envio || '';
-    document.getElementById('envio-acab-tipo').value          = e.tipo_acabamento || '';
-    document.getElementById('envio-acab-referencia').value    = e.referencia || '';
-    selLav.value                                              = e.lavanderia_id || '';
-    document.getElementById('envio-acab-qtd-enviada').value   = e.qtd_enviada || '';
-    document.getElementById('envio-acab-preco-unit').value    = e.preco_unit || '';
-    document.getElementById('envio-acab-qtd-retornada').value = e.qtd_retornada || '';
-    document.getElementById('envio-acab-data-retorno').value  = e.data_retorno || '';
-    document.getElementById('envio-acab-obs').value           = e.obs || '';
+    document.getElementById('envio-acab-id').value          = e.id;
+    document.getElementById('envio-acab-data-envio').value  = e.data_envio || '';
+    document.getElementById('envio-acab-tipo').value        = e.tipo_acabamento || '';
+    document.getElementById('envio-acab-referencia').value  = e.referencia || '';
+    selLav.value                                            = e.lavanderia_id || '';
+    document.getElementById('envio-acab-preco-unit').value  = e.preco_unit || '';
+    document.getElementById('envio-acab-data-retorno').value = e.data_retorno || '';
+    document.getElementById('envio-acab-obs').value         = e.obs || '';
+    coresEnvioTemp = (e.cores && e.cores.length) ? e.cores.map(c => ({...c})) : [{ cor: '', qtd_enviada: 0, qtd_retornada: 0 }];
   }
+  _renderCoresEnvioTabela(coresEnvioTemp);
   document.getElementById('modal-envio-acabamento').classList.add('open');
 }
 function editEnvioAcabamento(id) { openEnvioAcabamentoModal(id); }
 
 function saveEnvioAcabamento() {
-  const id          = document.getElementById('envio-acab-id').value;
-  const data_envio  = document.getElementById('envio-acab-data-envio').value;
+  const id              = document.getElementById('envio-acab-id').value;
+  const data_envio      = document.getElementById('envio-acab-data-envio').value;
   const tipo_acabamento = document.getElementById('envio-acab-tipo').value;
-  const referencia  = document.getElementById('envio-acab-referencia').value.trim();
-  const lavanderia_id = document.getElementById('envio-acab-lavanderia').value;
-  const qtd_enviada = document.getElementById('envio-acab-qtd-enviada').value;
+  const referencia      = document.getElementById('envio-acab-referencia').value.trim();
+  const lavanderia_id   = document.getElementById('envio-acab-lavanderia').value;
 
-  if (!data_envio)      { alert('Informe a data do envio.');     return; }
+  if (!data_envio)      { alert('Informe a data do envio.');        return; }
   if (!tipo_acabamento) { alert('Selecione o tipo de acabamento.'); return; }
-  if (!referencia)      { alert('Informe a referência/modelo.'); return; }
-  if (!lavanderia_id)   { alert('Selecione a lavanderia.');       return; }
-  if (!qtd_enviada)     { alert('Informe a quantidade enviada.'); return; }
+  if (!referencia)      { alert('Informe a referência/modelo.');    return; }
+  if (!lavanderia_id)   { alert('Selecione a lavanderia.');         return; }
+
+  // Sincroniza cores com valores atuais dos inputs
+  const rows = document.querySelectorAll('#tbody-cores-envio tr');
+  rows.forEach((tr, i) => {
+    const inputs = tr.querySelectorAll('input');
+    if (coresEnvioTemp[i]) {
+      coresEnvioTemp[i].cor           = inputs[0]?.value?.trim() || '';
+      coresEnvioTemp[i].qtd_enviada   = Number(inputs[1]?.value) || 0;
+      coresEnvioTemp[i].qtd_retornada = Number(inputs[2]?.value) || 0;
+    }
+  });
+
+  const coresFiltradas = coresEnvioTemp.filter(c => c.cor);
+  if (!coresFiltradas.length) { alert('Adicione ao menos uma cor com quantidade.'); return; }
+  const totalEnv = coresFiltradas.reduce((s,c) => s+(Number(c.qtd_enviada)||0), 0);
+  if (!totalEnv) { alert('Informe a quantidade enviada em ao menos uma cor.'); return; }
 
   const obj = {
     data_envio,
     tipo_acabamento,
     referencia,
     lavanderia_id,
-    qtd_enviada:    Number(qtd_enviada),
-    preco_unit:     Number(document.getElementById('envio-acab-preco-unit').value)    || 0,
-    qtd_retornada:  Number(document.getElementById('envio-acab-qtd-retornada').value) || 0,
-    data_retorno:   document.getElementById('envio-acab-data-retorno').value,
-    obs:            document.getElementById('envio-acab-obs').value.trim(),
+    preco_unit:  Number(document.getElementById('envio-acab-preco-unit').value) || 0,
+    data_retorno: document.getElementById('envio-acab-data-retorno').value,
+    obs:          document.getElementById('envio-acab-obs').value.trim(),
+    cores:        coresFiltradas,
   };
 
   const lav = lavanderiasEmp.find(l => l.id === lavanderia_id);
@@ -6292,7 +6372,7 @@ function saveEnvioAcabamento() {
     registrarAuditoria('editar','envio_acabamento',`Editou envio ${referencia} – ${tipo_acabamento} – ${lav?.nome||''}`);
   } else {
     enviosAcabamento.push({ id: uid(), ...obj });
-    registrarAuditoria('criar','envio_acabamento',`Criou envio ${referencia} – ${tipo_acabamento} – ${lav?.nome||''} – ${qtd_enviada} pç`);
+    registrarAuditoria('criar','envio_acabamento',`Criou envio ${referencia} – ${tipo_acabamento} – ${lav?.nome||''} – ${totalEnv} pç`);
   }
   save('oc_envios_acabamento', enviosAcabamento);
   closeModal('modal-envio-acabamento');
