@@ -142,6 +142,120 @@ async def sessions_by_day(days: int = Query(30)):
     return result
 
 
+@router.get("/daily")
+async def daily(date: str = Query(..., description="YYYY-MM-DD")):
+    """Sessões, transações e receita para uma data específica"""
+    if not PROPERTY_ID:
+        raise HTTPException(400, "GA4 não configurado")
+
+    from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Metric
+
+    client = get_client()
+    request = RunReportRequest(
+        property=f"properties/{PROPERTY_ID}",
+        date_ranges=[DateRange(start_date=date, end_date=date)],
+        metrics=[
+            Metric(name="sessions"),
+            Metric(name="transactions"),
+            Metric(name="purchaseRevenue"),
+        ],
+    )
+    response = client.run_report(request)
+    row = response.rows[0].metric_values if response.rows else []
+
+    def val(i):
+        return row[i].value if i < len(row) else "0"
+
+    return {
+        "date": date,
+        "sessions": int(val(0)),
+        "transactions": int(val(1)),
+        "revenue": round(float(val(2)), 2),
+    }
+
+
+@router.get("/channels")
+async def channels(date: str = Query(..., description="YYYY-MM-DD")):
+    """Receita por canal para uma data específica"""
+    if not PROPERTY_ID:
+        raise HTTPException(400, "GA4 não configurado")
+
+    from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Metric, Dimension
+
+    client = get_client()
+    request = RunReportRequest(
+        property=f"properties/{PROPERTY_ID}",
+        date_ranges=[DateRange(start_date=date, end_date=date)],
+        dimensions=[Dimension(name="sessionDefaultChannelGrouping")],
+        metrics=[
+            Metric(name="sessions"),
+            Metric(name="purchaseRevenue"),
+        ],
+        limit=20,
+    )
+    response = client.run_report(request)
+
+    result = {}
+    for row in response.rows:
+        channel = row.dimension_values[0].value.lower()
+        sessions = int(row.metric_values[0].value)
+        revenue = round(float(row.metric_values[1].value), 2)
+        result[channel] = {"sessions": sessions, "revenue": revenue}
+
+    # Map GA4 channel names to our fields
+    channel_map = {
+        "direct": "direct",
+        "organic search": "organic",
+        "email": "edrone",
+        "organic social": "social",
+        "referral": "social",
+        "paid social": "facebook",
+        "paid search": "google_ga4",
+        "display": "google_ga4",
+        "cross-network": "google_ga4",
+    }
+
+    mapped = {}
+    for ga4_channel, data in result.items():
+        key = next((v for k, v in channel_map.items() if k in ga4_channel), None)
+        if key:
+            if key not in mapped:
+                mapped[key] = {"sessions": 0, "revenue": 0.0}
+            mapped[key]["sessions"] += data["sessions"]
+            mapped[key]["revenue"] = round(mapped[key]["revenue"] + data["revenue"], 2)
+
+    return {"date": date, "channels": result, "mapped": mapped}
+
+
+@router.get("/googleads-cost")
+async def googleads_cost(date: str = Query(..., description="YYYY-MM-DD")):
+    """Custo do Google Ads via GA4 (requer link Google Ads ↔ GA4)"""
+    if not PROPERTY_ID:
+        raise HTTPException(400, "GA4 não configurado")
+
+    from google.analytics.data_v1beta.types import RunReportRequest, DateRange, Metric, Dimension
+
+    client = get_client()
+    request = RunReportRequest(
+        property=f"properties/{PROPERTY_ID}",
+        date_ranges=[DateRange(start_date=date, end_date=date)],
+        dimensions=[Dimension(name="sessionGoogleAdsAdNetworkType")],
+        metrics=[Metric(name="advertiserAdCost")],
+    )
+    response = client.run_report(request)
+
+    total = 0.0
+    breakdown = {}
+    for row in response.rows:
+        network = row.dimension_values[0].value
+        cost = float(row.metric_values[0].value)
+        if network != "(not set)":
+            breakdown[network] = round(cost, 2)
+            total += cost
+
+    return {"date": date, "spend_brl": round(total, 2), "breakdown": breakdown}
+
+
 @router.get("/top-pages")
 async def top_pages(days: int = Query(30), limit: int = Query(10)):
     """Páginas mais acessadas"""

@@ -1,7 +1,8 @@
 """
-Meta Ads Integration — Duas contas (BRL + USD)
-- Conta 01 (BRL): act_87371826  → gasto × 1.1383 (imposto)
-- Conta 03 (USD): act_432634632394891 → gasto × cotação USD/BRL × (1 + spread 5%)
+Meta Ads Integration — 3 contas
+- Conta 01 (BRL): act_87371826          → gasto × 1.1383 (imposto)
+- Conta 02 (USD): act_1137907124668278  → gasto × cotação USD/BRL × (1 + spread 5%)
+- Conta 03 (USD): act_432634632394891   → gasto × cotação USD/BRL × (1 + spread 5%)
 """
 from fastapi import APIRouter, HTTPException, Query
 from datetime import datetime, timedelta
@@ -23,10 +24,16 @@ ACCOUNTS = {
         "tax":      float(os.getenv("META_ACCOUNT_BRL_TAX", "1.1383")),
         "label":    "Conta 01 (BRL)",
     },
-    "usd": {
-        "id":       os.getenv("META_ACCOUNT_USD_ID", "act_432634632394891"),
+    "usd2": {
+        "id":       os.getenv("META_ACCOUNT_USD2_ID", "act_1137907124668278"),
         "currency": "USD",
-        "spread":   float(os.getenv("META_ACCOUNT_USD_SPREAD", "0.05")),
+        "spread":   float(os.getenv("META_ACCOUNT_USD2_SPREAD", "0.05")),
+        "label":    "Conta 02 (USD)",
+    },
+    "usd3": {
+        "id":       os.getenv("META_ACCOUNT_USD3_ID", "act_432634632394891"),
+        "currency": "USD",
+        "spread":   float(os.getenv("META_ACCOUNT_USD3_SPREAD", "0.05")),
         "label":    "Conta 03 (USD)",
     },
 }
@@ -43,7 +50,7 @@ def save_settings(data: dict):
 
 async def get_usd_brl_rate() -> float:
     settings = load_settings()
-    spread = ACCOUNTS["usd"]["spread"]
+    spread = ACCOUNTS["usd2"]["spread"]
     if settings.get("use_manual_rate") and settings.get("usd_rate_manual"):
         return round(float(settings["usd_rate_manual"]) * (1 + spread), 4)
     try:
@@ -162,6 +169,56 @@ async def spend_by_day(days: int = Query(30)):
     for r in result:
         r["spend"] = round(r["spend"], 2)
     return result
+
+@router.get("/spend-by-date/{target_date}")
+async def spend_by_date(target_date: str):
+    """Retorna gasto por conta para uma data específica (YYYY-MM-DD).
+    Valores iguais ao Meta Ads — sem multiplicadores de imposto ou spread."""
+
+    # Cotação limpa (sem spread) para converter USD → BRL
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get("https://economia.awesomeapi.com.br/last/USD-BRL")
+            raw_usd_rate = float(r.json()["USDBRL"]["bid"])
+    except Exception:
+        settings = load_settings()
+        raw_usd_rate = float(settings.get("usd_rate_manual") or 5.50)
+
+    result = {"date": target_date, "usd_rate": raw_usd_rate, "accounts": {}, "total_brl": 0.0}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        for key, acc in ACCOUNTS.items():
+            r = await client.get(
+                f"{BASE}/{acc['id']}/insights",
+                params={
+                    "access_token": ACCESS_TOKEN,
+                    "time_range": f'{{"since":"{target_date}","until":"{target_date}"}}',
+                    "fields": "spend,impressions,clicks",
+                    "level": "account",
+                }
+            )
+            rows = r.json().get("data", []) if r.status_code == 200 else []
+            d = rows[0] if rows else {}
+            spend_raw = float(d.get("spend", 0))
+            # BRL: valor Meta × 1.1383 (imposto)
+            # USD: valor Meta × cotação × 1.05 (spread)
+            if key == "brl":
+                tax = float(os.getenv("META_ACCOUNT_BRL_TAX", "1.1383"))
+                spend_brl = round(spend_raw * tax, 2)
+            else:
+                spread = 1 + acc.get("spread", 0.05)
+                spend_brl = round(spend_raw * raw_usd_rate * spread, 2)
+            result["accounts"][key] = {
+                "label": acc["label"],
+                "currency": acc["currency"],
+                "spend_original": round(spend_raw, 2),
+                "spend_brl": spend_brl,
+            }
+            result["total_brl"] += spend_brl
+
+    result["total_brl"] = round(result["total_brl"], 2)
+    return result
+
 
 @router.get("/campaigns/summary")
 async def campaigns_summary(days: int = Query(30)):
