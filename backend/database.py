@@ -6,7 +6,10 @@ import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 
-DB_PATH = Path(__file__).parent / "marketing.db"
+# No Railway usa /data/marketing.db (volume persistente), localmente usa pasta do backend
+import os
+_data_dir = Path(os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", Path(__file__).parent))
+DB_PATH = Path(_data_dir) / "marketing.db"
 
 
 def _conn():
