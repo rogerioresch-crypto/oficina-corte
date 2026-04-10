@@ -4347,6 +4347,7 @@ function saveCorteLote() {
 function atualizarInfoBarCorte(ordemId, m) {
   const o = getOrdem(ordemId);
   if (!o) return;
+  const grade      = m ? m.grade : SIZES;
   const todos     = o.cortes_realizados || [];
   const cortes    = todos.filter(c => c.tipo === 'corte' || !c.tipo); // legado sem tipo = corte
   const entregas  = todos.filter(c => c.tipo === 'entrega');
