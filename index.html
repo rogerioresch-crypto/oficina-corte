@@ -742,6 +742,17 @@
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px" id="header-user-area">
     <span id="header-role-badge" style="font-size:.72rem;background:rgba(255,255,255,.2);padding:3px 9px;border-radius:20px;font-weight:600"></span>
     <span id="header-nome-usuario" style="font-size:.82rem;font-weight:600;opacity:.95"></span>
+    <button id="btn-backup" onclick="fazerBackup()" title="Exportar backup completo dos dados"
+      style="display:none;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 14px;border-radius:7px;font-size:.78rem;cursor:pointer;font-weight:600">
+      💾 Backup
+    </button>
+    <label id="btn-restore-wrap" title="Importar backup" style="display:none">
+      <input type="file" id="input-restore" accept=".json" style="display:none" onchange="restaurarBackup(this)">
+      <span onclick="document.getElementById('input-restore').click()"
+        style="background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 14px;border-radius:7px;font-size:.78rem;cursor:pointer;font-weight:600">
+        📂 Restaurar
+      </span>
+    </label>
     <button onclick="fazerLogout()" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 14px;border-radius:7px;font-size:.78rem;cursor:pointer;font-weight:600">
       🚪 Sair
     </button>
@@ -5178,6 +5189,52 @@ function fazerLogin() {
   renderDashboard();
 }
 
+function fazerBackup() {
+  const backup = { _versao: 1, _data: new Date().toISOString() };
+  FB_KEYS.forEach(k => {
+    try { backup[k] = JSON.parse(localStorage.getItem(k)) || []; } catch { backup[k] = []; }
+  });
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const ts   = new Date().toISOString().slice(0,10);
+  a.href     = url;
+  a.download = `oficinas-backup-${ts}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function restaurarBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Validação básica
+      if (!data._versao || !data.oc_ordens) {
+        alert('❌ Arquivo inválido ou não é um backup do Oficinas de Costura.');
+        input.value = '';
+        return;
+      }
+      const total = FB_KEYS.reduce((a, k) => a + ((data[k] || []).length || 0), 0);
+      if (!confirm(`⚠️ Restaurar backup de ${data._data ? new Date(data._data).toLocaleString('pt-BR') : 'data desconhecida'}?\n\n${total} registros serão importados.\n\nOs dados atuais serão SUBSTITUÍDOS. Tem certeza?`)) {
+        input.value = '';
+        return;
+      }
+      FB_KEYS.forEach(k => {
+        if (data[k] !== undefined) localStorage.setItem(k, JSON.stringify(data[k]));
+      });
+      alert('✅ Backup restaurado com sucesso! O app será recarregado.');
+      location.reload();
+    } catch {
+      alert('❌ Erro ao ler o arquivo. Verifique se é um backup válido.');
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
 function fazerLogout() {
   usuarioLogado = null;
   localStorage.removeItem('oc_sessao');
@@ -5200,6 +5257,12 @@ function aplicarPermissoes() {
   document.getElementById('header-nome-usuario').textContent = usuarioLogado.nome;
   document.getElementById('header-role-badge').textContent =
     isAdmin ? '👑 Admin' : isOficina ? `🏭 ${usuarioLogado.oficina_nome||'Oficina'}` : '👤 Operador';
+
+  // Botões Backup/Restore — só admin
+  const btnBackup = document.getElementById('btn-backup');
+  const btnRestoreWrap = document.getElementById('btn-restore-wrap');
+  if (btnBackup)      btnBackup.style.display      = isAdmin ? '' : 'none';
+  if (btnRestoreWrap) btnRestoreWrap.style.display  = isAdmin ? '' : 'none';
 
   // Abas admin-only
   document.querySelectorAll('.tab-admin').forEach(tab => {
