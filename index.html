@@ -1023,7 +1023,20 @@
         <option value="entregue">Entregue</option>
         <option value="cancelada">Cancelada</option>
       </select>
-      <input type="text" id="filter-search-ordem" placeholder="Buscar número/oficina/modelo…" oninput="renderOrdens()" style="min-width:220px">
+      <select id="filter-oficina-ordem" onchange="renderOrdens()" style="min-width:160px">
+        <option value="">Todas as oficinas</option>
+      </select>
+      <select id="filter-segmento-ordem" onchange="renderOrdens()">
+        <option value="">Todos os segmentos</option>
+        <option value="malharia">🧶 Malharia</option>
+        <option value="jeans">👖 Jeans</option>
+        <option value="sarja">🧥 Sarja</option>
+      </select>
+      <input type="text" id="filter-search-ordem" placeholder="Buscar número/oficina/modelo…" oninput="renderOrdens()" style="min-width:200px">
+      <button onclick="limparFiltrosOrdens()" title="Limpar filtros"
+        style="background:#f1f5f9;border:1px solid #e2e8f0;color:#64748b;padding:6px 12px;border-radius:7px;font-size:.8rem;cursor:pointer;white-space:nowrap">
+        ✕ Limpar
+      </button>
     </div>
     <div class="table-wrap">
       <table id="table-ordens">
@@ -3366,8 +3379,19 @@ function deleteModelo(id) {
 ============================================================ */
 function renderOrdens() {
   const tbody = document.getElementById('tbody-ordens');
-  const filterStatus = document.getElementById('filter-status-ordem').value;
-  const filterSearch = (document.getElementById('filter-search-ordem').value || '').toLowerCase();
+  const filterStatus   = document.getElementById('filter-status-ordem').value;
+  const filterSearch   = (document.getElementById('filter-search-ordem').value || '').toLowerCase();
+  const filterOficina  = document.getElementById('filter-oficina-ordem')?.value || '';
+  const filterSegmento = document.getElementById('filter-segmento-ordem')?.value || '';
+
+  // Popular select de oficinas dinamicamente
+  const selOf = document.getElementById('filter-oficina-ordem');
+  if (selOf) {
+    const prev = selOf.value;
+    const nomes = [...new Set(ordens.map(o => o.oficina).filter(Boolean))].sort();
+    selOf.innerHTML = '<option value="">Todas as oficinas</option>' +
+      nomes.map(n => `<option value="${n}" ${n===prev?'selected':''}>${n}</option>`).join('');
+  }
 
   let list = [...ordens].sort((a, b) => b.data.localeCompare(a.data));
   // Oficina só vê suas próprias ordens
@@ -3378,7 +3402,9 @@ function renderOrdens() {
     if (oficinaNome) usuarioLogado.oficina_nome = oficinaNome;
     list = oficinaNome ? list.filter(o => o.oficina === oficinaNome) : [];
   }
-  if (filterStatus) list = list.filter(o => o.status === filterStatus);
+  if (filterStatus)   list = list.filter(o => o.status === filterStatus);
+  if (filterOficina)  list = list.filter(o => o.oficina === filterOficina);
+  if (filterSegmento) list = list.filter(o => { const m = getModelo(o.modelo_id); return m?.segmento === filterSegmento; });
   if (filterSearch) {
     list = list.filter(o => {
       const m = getModelo(o.modelo_id);
@@ -3462,6 +3488,14 @@ function renderOrdens() {
       </div></td>
     </tr>`;
   }).join('');
+}
+
+function limparFiltrosOrdens() {
+  document.getElementById('filter-status-ordem').value   = '';
+  document.getElementById('filter-oficina-ordem').value  = '';
+  document.getElementById('filter-segmento-ordem').value = '';
+  document.getElementById('filter-search-ordem').value   = '';
+  renderOrdens();
 }
 
 function openOrdemModal(id) {
