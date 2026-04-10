@@ -4090,7 +4090,7 @@ function renderCoresOrdem() {
 function sumQtdFromCortes(cortes) {
   let total = 0;
   (cortes || []).forEach(c => {
-    SIZES.forEach(s => { total += Number((c.qtd || {})[s]) || 0; });
+    Object.values(c.qtd || {}).forEach(v => { total += Number(v) || 0; });
   });
   return total;
 }
