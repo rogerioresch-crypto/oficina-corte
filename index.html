@@ -5651,10 +5651,10 @@ function parseRomaneioText(text) {
   const dtMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   if (dtMatch) data = `${dtMatch[3]}-${dtMatch[2]}-${dtMatch[1]}`;
 
-  // Fornecedor: linha com "EMPRESA:"
+  // Fornecedor: linha com "EMPRESA:" — captura qualquer conteúdo após o marcador
   let fornecedor = '';
-  const empMatch = text.match(/EMPRESA:\s*([A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\n\r]+)/i);
-  if (empMatch) fornecedor = empMatch[1].trim();
+  const empMatch = text.match(/EMPRESA[:\s]+([^\n\r]{3,60})/i);
+  if (empMatch) fornecedor = empMatch[1].replace(/\s{2,}/g, ' ').trim();
 
   // Linha de produto/cor — sem âncora ^, aceita prefixos como "SEQ.:" ou "PRODUTO:"
   // Formato: [qualquer coisa] NNNN [código com pontos] - DESCRIÇÃO
@@ -5706,23 +5706,42 @@ function parseRomaneioText(text) {
     oficina: ''
   })).filter(c => c.rolos.length);
 
-  // Tenta adivinhar tecido pelo prefixo
+  // Tenta adivinhar tecido pelo maior número de palavras em comum com o prefixo
   let tecidoGuess = '';
+  let bestScore = 0;
+  const prefWords = prefixClean.toLowerCase().split(/\s+/).filter(w => w.length > 2);
   tecidos.forEach(t => {
-    const a = prefixClean.toLowerCase();
-    const b = t.nome.toLowerCase();
-    if (a.includes(b) || b.includes(a.slice(0, Math.min(15, a.length)))) tecidoGuess = t.id;
+    const tWords = t.nome.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+    const score = prefWords.filter(w => tWords.includes(w)).length
+                + tWords.filter(w => prefWords.includes(w)).length;
+    if (score > bestScore) { bestScore = score; tecidoGuess = t.id; }
   });
 
   return { nf, data, fornecedor, cores, tecidoGuess, fabricDesc: prefixClean };
 }
 
+// Palavras que indicam cor/estampa — quando aparecem separam nome-do-tecido da cor
+const COR_KEYWORDS = [
+  'preto','branco','branca','cinza','bege','marfim','cru','off','navy','azul','vermelho',
+  'verde','rosa','lilas','lilás','roxo','laranja','amarelo','dourado','prata','nude',
+  'caramelo','camel','khaki','kaki','coral','bordo','bordô','marrom','chocolate',
+  'grafite','mescla','jeans','estampa','ramado','floral','listrado','xadrez','tie','zouk',
+  'plus','print','digital'
+];
+
 function commonPrefix(strs) {
   if (!strs.length) return '';
   if (strs.length === 1) {
-    // tenta cortar na última palavra (provavelmente a cor)
+    // Tenta identificar onde começa a cor pelas COR_KEYWORDS
     const parts = strs[0].split(' ');
-    return parts.slice(0, -1).join(' ');
+    let cutAt = parts.length - 1; // fallback: corta última palavra
+    for (let i = 0; i < parts.length; i++) {
+      if (COR_KEYWORDS.includes(parts[i].toLowerCase())) {
+        cutAt = i;
+        break;
+      }
+    }
+    return parts.slice(0, cutAt).join(' ');
   }
   let prefix = strs[0];
   for (let i = 1; i < strs.length; i++) {
