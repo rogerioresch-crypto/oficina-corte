@@ -5641,43 +5641,41 @@ async function processRomaneio(file) {
 function parseRomaneioText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // Helper: pega o valor após um marcador, mesmo que esteja na linha seguinte
-  // Ex: "NOTA FISCAL:\n\n000774030" → "000774030"
-  function afterLabel(label, src) {
-    const re = new RegExp(label + '[:\\s]*([^\\n\\r]{0,10}\\n[^\\n\\r]*|[^\\n\\r]+)', 'i');
-    const m = src.match(re);
-    return m ? m[1].replace(/[\n\r]/g, ' ').trim() : '';
-  }
+  // ── Extração dos campos do cabeçalho ────────────────────────────────────
+  // Regexes literais — suportam label e valor na mesma linha ou em linhas separadas.
 
-  // NF: campo "NOTA FISCAL:" — valor pode estar na próxima linha
+  // NF: pega todos os números entre "NOTA FISCAL" e "DATA EMISSÃO" e usa o último
+  // (o primeiro número no bloco é o pedido, o segundo é a NF)
   let nf = '';
-  const nfRaw = afterLabel('NOTA\\s+FISCAL', text);
-  const nfDigits = nfRaw.match(/0*(\d{5,9})/);
-  if (nfDigits) nf = nfDigits[1];
+  const nfBloco = text.match(/NOTA\s+FISCAL[\s\S]*?([\d]{6,9})[\s\S]*?DATA\s+EMISS/i);
+  if (nfBloco) {
+    // Encontra todos os números de 6-9 dígitos no trecho e pega o último (= NF)
+    const todosNums = text.match(/NOTA\s+FISCAL[\s:]*\n?([\s\S]*?)DATA\s+EMISS/i);
+    if (todosNums) {
+      const nums = todosNums[1].match(/\d{6,9}/g) || [];
+      if (nums.length) nf = nums[nums.length - 1].replace(/^0+/, '');
+    }
+  }
+  if (!nf) {
+    const nfFallback = text.match(/NOTA\s+FISCAL[\s:]*\n*\s*([\d]+)/i);
+    if (nfFallback) nf = nfFallback[1].replace(/^0+/, '');
+  }
 
-  // Data: campo "DATA EMISSÃO:" — valor na linha seguinte, formato DD/MM/YYYY
+  // Data (prioriza DATA EMISSÃO, ignora rodapé DD/MM/YY)
   let data = '';
-  const dtRaw = afterLabel('DATA\\s+EMISS[ÃA]O', text);
-  const dtM = dtRaw.match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
-  if (dtM) {
-    let ano = dtM[3];
-    if (ano.length === 2) ano = '20' + ano;
-    data = `${ano}-${dtM[2]}-${dtM[1]}`;
+  const dtAnc = text.match(/DATA\s+EMISS[\u00c3A]O[\s:]*\n*\s*(\d{2})\/(\d{2})\/(\d{2,4})/i);
+  if (dtAnc) {
+    let ano = dtAnc[3]; if (ano.length === 2) ano = '20' + ano;
+    data = ano + '-' + dtAnc[2] + '-' + dtAnc[1];
   } else {
-    // fallback: primeira data de 4 dígitos no texto (ignora DD/MM/YY do rodapé)
     const dtFull = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (dtFull) data = `${dtFull[3]}-${dtFull[2]}-${dtFull[1]}`;
+    if (dtFull) data = dtFull[3] + '-' + dtFull[2] + '-' + dtFull[1];
   }
 
-  // Fornecedor: "EMPRESA:" seguido do nome na mesma linha ou na próxima
+  // Fornecedor: após "EMPRESA" (com ou sem \n entre label e valor)
   let fornecedor = '';
-  const empRaw = afterLabel('EMPRESA', text);
-  if (empRaw) {
-    fornecedor = empRaw
-      .replace(/\d{2}\/\d{2}.*$/, '')  // remove lixo de data/hora
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-  }
+  const empM = text.match(/EMPRESA[\s:]*\n*\s*([A-Z][A-Z\u00c0-\u00ff\s\-\.]+?)(?=\n|\r|PROGRAMA|PEDIDO)/i);
+  if (empM) fornecedor = empM[1].replace(/\s{2,}/g, ' ').trim();
 
   // Linha de produto/cor — sem âncora ^, aceita prefixos como "SEQ.:" ou "PRODUTO:"
   // Formato: [qualquer coisa] NNNN [código com pontos] - DESCRIÇÃO
