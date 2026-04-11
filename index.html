@@ -5641,35 +5641,41 @@ async function processRomaneio(file) {
 function parseRomaneioText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // NF: campo "NOTA FISCAL:" seguido do número (ex: 000774030)
-  let nf = '';
-  const nfMatch = text.match(/NOTA\s+FISCAL[:\s]+0*(\d{5,9})/i)
-               || text.match(/\bNF[:\s]+0*(\d{5,9})/i)
-               || text.match(/\b0{2,}(\d{5,7})\b/);
-  if (nfMatch) nf = nfMatch[1];
-
-  // Data: busca primeiro "DATA EMISSÃO:" ou "DATA:" antes de qualquer data do rodapé
-  // Suporta DD/MM/YYYY e DD/MM/YY
-  let data = '';
-  const dtAnchoredMatch = text.match(/DATA\s+EMISS[ÃA]O[:\s]+(\d{2})\/(\d{2})\/(\d{2,4})/i)
-                       || text.match(/DATA[:\s]+(\d{2})\/(\d{2})\/(\d{2,4})/i);
-  if (dtAnchoredMatch) {
-    let ano = dtAnchoredMatch[3];
-    if (ano.length === 2) ano = '20' + ano;
-    data = `${ano}-${dtAnchoredMatch[2]}-${dtAnchoredMatch[1]}`;
-  } else {
-    // fallback: primeira data DD/MM/YYYY do texto (ignora datas de rodapé DD/MM/YY)
-    const dtMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-    if (dtMatch) data = `${dtMatch[3]}-${dtMatch[2]}-${dtMatch[1]}`;
+  // Helper: pega o valor após um marcador, mesmo que esteja na linha seguinte
+  // Ex: "NOTA FISCAL:\n\n000774030" → "000774030"
+  function afterLabel(label, src) {
+    const re = new RegExp(label + '[:\\s]*([^\\n\\r]{0,10}\\n[^\\n\\r]*|[^\\n\\r]+)', 'i');
+    const m = src.match(re);
+    return m ? m[1].replace(/[\n\r]/g, ' ').trim() : '';
   }
 
-  // Fornecedor: linha com "EMPRESA:" — pega somente até o fim da linha, limpa espaços
+  // NF: campo "NOTA FISCAL:" — valor pode estar na próxima linha
+  let nf = '';
+  const nfRaw = afterLabel('NOTA\\s+FISCAL', text);
+  const nfDigits = nfRaw.match(/0*(\d{5,9})/);
+  if (nfDigits) nf = nfDigits[1];
+
+  // Data: campo "DATA EMISSÃO:" — valor na linha seguinte, formato DD/MM/YYYY
+  let data = '';
+  const dtRaw = afterLabel('DATA\\s+EMISS[ÃA]O', text);
+  const dtM = dtRaw.match(/(\d{2})\/(\d{2})\/(\d{2,4})/);
+  if (dtM) {
+    let ano = dtM[3];
+    if (ano.length === 2) ano = '20' + ano;
+    data = `${ano}-${dtM[2]}-${dtM[1]}`;
+  } else {
+    // fallback: primeira data de 4 dígitos no texto (ignora DD/MM/YY do rodapé)
+    const dtFull = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (dtFull) data = `${dtFull[3]}-${dtFull[2]}-${dtFull[1]}`;
+  }
+
+  // Fornecedor: "EMPRESA:" seguido do nome na mesma linha ou na próxima
   let fornecedor = '';
-  const empMatch = text.match(/EMPRESA[:\s]+([A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\n\r]{2,60})/i);
-  if (empMatch) {
-    fornecedor = empMatch[1]
-      .replace(/\s{2,}/g, ' ')   // colapsa espaços múltiplos
-      .replace(/\d{2}\/\d{2}.*$/, '') // remove lixo de data/hora no final
+  const empRaw = afterLabel('EMPRESA', text);
+  if (empRaw) {
+    fornecedor = empRaw
+      .replace(/\d{2}\/\d{2}.*$/, '')  // remove lixo de data/hora
+      .replace(/\s{2,}/g, ' ')
       .trim();
   }
 
