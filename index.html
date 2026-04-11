@@ -5827,8 +5827,8 @@ function confirmarImportacaoRomaneio() {
   const entrada = {
     id: uid(),
     tecido_id: tecidoId,
-    numero_nf: nf,
-    data_entrada: data,
+    nf: nf,
+    data: data,
     fornecedor: forn,
     observacao: `Importado do romaneio NF ${nf}`,
     cores: cores.map(c => ({ cor: c.cor, oficina: c.oficina || '', rolos: c.rolos }))
