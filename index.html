@@ -5641,20 +5641,37 @@ async function processRomaneio(file) {
 function parseRomaneioText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // NF: sequência de 6 dígitos precedida de zeros (ex: 000767455 → 767455)
+  // NF: campo "NOTA FISCAL:" seguido do número (ex: 000774030)
   let nf = '';
-  const nfMatch = text.match(/\b0*(\d{5,7})\b(?=\s)/);
+  const nfMatch = text.match(/NOTA\s+FISCAL[:\s]+0*(\d{5,9})/i)
+               || text.match(/\bNF[:\s]+0*(\d{5,9})/i)
+               || text.match(/\b0{2,}(\d{5,7})\b/);
   if (nfMatch) nf = nfMatch[1];
 
-  // Data: DD/MM/YYYY
+  // Data: busca primeiro "DATA EMISSÃO:" ou "DATA:" antes de qualquer data do rodapé
+  // Suporta DD/MM/YYYY e DD/MM/YY
   let data = '';
-  const dtMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
-  if (dtMatch) data = `${dtMatch[3]}-${dtMatch[2]}-${dtMatch[1]}`;
+  const dtAnchoredMatch = text.match(/DATA\s+EMISS[ÃA]O[:\s]+(\d{2})\/(\d{2})\/(\d{2,4})/i)
+                       || text.match(/DATA[:\s]+(\d{2})\/(\d{2})\/(\d{2,4})/i);
+  if (dtAnchoredMatch) {
+    let ano = dtAnchoredMatch[3];
+    if (ano.length === 2) ano = '20' + ano;
+    data = `${ano}-${dtAnchoredMatch[2]}-${dtAnchoredMatch[1]}`;
+  } else {
+    // fallback: primeira data DD/MM/YYYY do texto (ignora datas de rodapé DD/MM/YY)
+    const dtMatch = text.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (dtMatch) data = `${dtMatch[3]}-${dtMatch[2]}-${dtMatch[1]}`;
+  }
 
-  // Fornecedor: linha com "EMPRESA:" — captura qualquer conteúdo após o marcador
+  // Fornecedor: linha com "EMPRESA:" — pega somente até o fim da linha, limpa espaços
   let fornecedor = '';
-  const empMatch = text.match(/EMPRESA[:\s]+([^\n\r]{3,60})/i);
-  if (empMatch) fornecedor = empMatch[1].replace(/\s{2,}/g, ' ').trim();
+  const empMatch = text.match(/EMPRESA[:\s]+([A-ZÁÀÃÂÉÊÍÓÔÕÚÇ][^\n\r]{2,60})/i);
+  if (empMatch) {
+    fornecedor = empMatch[1]
+      .replace(/\s{2,}/g, ' ')   // colapsa espaços múltiplos
+      .replace(/\d{2}\/\d{2}.*$/, '') // remove lixo de data/hora no final
+      .trim();
+  }
 
   // Linha de produto/cor — sem âncora ^, aceita prefixos como "SEQ.:" ou "PRODUTO:"
   // Formato: [qualquer coisa] NNNN [código com pontos] - DESCRIÇÃO
