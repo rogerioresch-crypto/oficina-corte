@@ -5531,6 +5531,26 @@ function init() {
     apply();
   }
 
+  // Migração: entradas sem tipo_unidade herdam unidade_estoque do tecido cadastrado
+  let migrou = false;
+  entradasEstoque.forEach(e => {
+    if (!e.tipo_unidade) {
+      const tec = getTecido(e.tecido_id);
+      // se tem metros nos rolos mas kg=0, é uma entrada em metros
+      const temMetros = e.cores && e.cores.some(c => c.rolos && c.rolos.some(r => (parseFloat(r.metros)||0) > 0));
+      const temKg     = e.cores && e.cores.some(c => c.rolos && c.rolos.some(r => (parseFloat(r.kg)||0) > 0));
+      if (tec?.unidade_estoque === 'metros' || (temMetros && !temKg)) {
+        e.tipo_unidade = 'metros';
+        e.kg_por_metro = e.kg_por_metro || tec?.peso_kg_metro || 0;
+        migrou = true;
+      } else {
+        e.tipo_unidade = 'kg';
+        migrou = true;
+      }
+    }
+  });
+  if (migrou) save('oc_entradas_estoque', entradasEstoque);
+
   renderDashboard();
 }
 
@@ -5877,12 +5897,16 @@ function confirmarImportacaoRomaneio() {
   const forn      = document.getElementById('rom-fornecedor').value.trim();
   const cores     = _romaneioData.cores;
 
+  const tecSel = getTecido(tecidoId);
+  const unImport = tecSel?.unidade_estoque || 'metros'; // romaneio sempre tem metros
   const entrada = {
     id: uid(),
     tecido_id: tecidoId,
     nf: nf,
     data: data,
     fornecedor: forn,
+    tipo_unidade: unImport,
+    kg_por_metro: tecSel?.peso_kg_metro || 0,
     observacao: `Importado do romaneio NF ${nf}`,
     cores: cores.map(c => ({ cor: c.cor, oficina: c.oficina || '', rolos: c.rolos }))
   };
