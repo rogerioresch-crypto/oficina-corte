@@ -1344,6 +1344,13 @@
           <input type="number" id="tecido-largura" min="0" step="1" placeholder="Ex: 160">
         </div>
         <div class="form-group">
+          <label>Unidade de Estoque *</label>
+          <select id="tecido-unidade-estoque">
+            <option value="kg">Quilogramas (kg) — malhas, moletom…</option>
+            <option value="metros">Metros (m) — sarja, jeans, tecido plano…</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Peso por metro (kg)</label>
           <input type="number" id="tecido-peso-metro" min="0" step="0.001" placeholder="Ex: 0.28">
         </div>
@@ -4677,10 +4684,13 @@ function calcEntradaMetrosTotal(entrada) {
 }
 
 function saldoTecido(tid) {
+  const tec          = getTecido(tid);
   const entradasTec  = entradasEstoque.filter(e => e.tecido_id === tid);
   const totalEntrada = entradasTec.reduce((s, e) => s + calcEntradaKgTotal(e), 0);
   const totalEntradaM= entradasTec.reduce((s, e) => s + calcEntradaMetrosTotal(e), 0);
-  const usaMetros    = entradasTec.some(e => (e.tipo_unidade || 'kg') === 'metros');
+  // usa unidade do cadastro do tecido como fonte primária; fallback nas entradas
+  const usaMetros    = (tec && tec.unidade_estoque === 'metros')
+    || entradasTec.some(e => (e.tipo_unidade || 'kg') === 'metros');
   const totalEnviado = ordens
     .filter(o => o.tecido_id === tid && o.status !== 'cancelada')
     .reduce((s, o) => s + (parseFloat(o.kg_enviado) || 0), 0);
@@ -4823,11 +4833,13 @@ function openTecidoModal(id) {
     document.getElementById('tecido-composicao').value   = t.composicao || '';
     document.getElementById('tecido-largura').value      = t.largura_cm || '';
     document.getElementById('tecido-peso-metro').value   = t.peso_kg_metro || '';
+    document.getElementById('tecido-unidade-estoque').value = t.unidade_estoque || 'kg';
     document.getElementById('tecido-fornecedor-id').value = t.fornecedor_id || '';
   } else {
     ['tecido-nome','tecido-composicao','tecido-largura','tecido-peso-metro'].forEach(fid => {
       document.getElementById(fid).value = '';
     });
+    document.getElementById('tecido-unidade-estoque').value = 'kg';
     document.getElementById('tecido-fornecedor-id').value = '';
   }
   document.getElementById('modal-tecido').classList.add('open');
@@ -4847,12 +4859,13 @@ function saveTecido() {
   const nome = document.getElementById('tecido-nome').value.trim();
   if (!nome) { alert('Informe o nome do tecido.'); return; }
   const record = {
-    id:            id || uid(),
+    id:               id || uid(),
     nome,
-    composicao:    document.getElementById('tecido-composicao').value.trim(),
-    largura_cm:    parseFloat(document.getElementById('tecido-largura').value) || 0,
-    peso_kg_metro: parseFloat(document.getElementById('tecido-peso-metro').value) || 0,
-    fornecedor_id: document.getElementById('tecido-fornecedor-id').value || ''
+    composicao:       document.getElementById('tecido-composicao').value.trim(),
+    largura_cm:       parseFloat(document.getElementById('tecido-largura').value) || 0,
+    peso_kg_metro:    parseFloat(document.getElementById('tecido-peso-metro').value) || 0,
+    unidade_estoque:  document.getElementById('tecido-unidade-estoque').value || 'kg',
+    fornecedor_id:    document.getElementById('tecido-fornecedor-id').value || ''
   };
   if (id) {
     const idx = tecidos.findIndex(t => t.id === id);
@@ -5055,10 +5068,16 @@ function _autoFillKgPorMetro() {
   const tid = document.getElementById('entrada-tecido')?.value;
   if (!tid) return;
   const tec = getTecido(tid);
-  if (tec && tec.peso_kg_metro) {
-    document.getElementById('entrada-kg-por-metro').value = tec.peso_kg_metro;
-    _renderEntradaCores();
+  if (!tec) return;
+  // pré-seleciona a unidade definida no cadastro do tecido
+  if (tec.unidade_estoque) {
+    document.querySelectorAll('input[name="entrada-unidade"]').forEach(r => { r.checked = r.value === tec.unidade_estoque; });
+    document.getElementById('entrada-peso-grupo').style.display = tec.unidade_estoque === 'metros' ? '' : 'none';
   }
+  if (tec.peso_kg_metro) {
+    document.getElementById('entrada-kg-por-metro').value = tec.peso_kg_metro;
+  }
+  _renderEntradaCores();
 }
 
 function _populateEntradaOficinaSelect(selectedVal) {
@@ -5082,9 +5101,11 @@ function openEntradaEstoqueModal(tecidoId, entradaId) {
   document.getElementById('entrada-id').value = entradaId || '';
   document.getElementById('modal-entrada-title').textContent = entradaId ? 'Editar Entrada' : 'Nova Entrada de Tecido';
 
-  // Reset
-  document.querySelectorAll('input[name="entrada-unidade"]').forEach(r => { r.checked = r.value === 'kg'; });
-  document.getElementById('entrada-peso-grupo').style.display = 'none';
+  // Reset — usa unidade padrão do tecido se disponível
+  const tecPadrao = tecidoId ? getTecido(tecidoId) : null;
+  const unPadrao  = tecPadrao?.unidade_estoque || 'kg';
+  document.querySelectorAll('input[name="entrada-unidade"]').forEach(r => { r.checked = r.value === unPadrao; });
+  document.getElementById('entrada-peso-grupo').style.display = unPadrao === 'metros' ? '' : 'none';
   document.getElementById('entrada-kg-por-metro').value = '';
 
   if (entradaId) {
