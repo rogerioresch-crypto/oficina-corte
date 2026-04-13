@@ -953,9 +953,9 @@
             <th>Tecido</th>
             <th>Composição</th>
             <th>Largura</th>
-            <th style="text-align:right">Entradas (kg)</th>
-            <th style="text-align:right">Enviado (kg)</th>
-            <th style="text-align:right">Saldo (kg)</th>
+            <th style="text-align:right">Entradas</th>
+            <th style="text-align:right">Enviado</th>
+            <th style="text-align:right">Saldo</th>
             <th>Status</th>
             <th>Ações</th>
           </tr>
@@ -993,7 +993,7 @@
             <th>Data</th>
             <th>Tecido</th>
             <th>Cor</th>
-            <th style="text-align:right">Quantidade (kg)</th>
+            <th style="text-align:right">Quantidade</th>
             <th>Fornecedor</th>
             <th>NF</th>
             <th>Ações</th>
@@ -4648,11 +4648,14 @@ function calcEntradaKgTotal(entrada) {
     const kgpm = parseFloat(entrada.kg_por_metro) || 0;
     return entrada.cores.reduce((s, cor) => {
       if (cor.rolos && cor.rolos.length) {
-        // novo formato com rolos individuais
-        const kgCor = cor.rolos.reduce((rs, r) => rs + (parseFloat(r.kg) || 0), 0);
-        return s + (un === 'metros' ? kgCor * kgpm : kgCor);
+        if (un === 'metros') {
+          // quando é metros: usa metros × kg_por_metro (se informado) ou o campo kg direto
+          const mCor  = cor.rolos.reduce((rs, r) => rs + (parseFloat(r.metros) || 0), 0);
+          const kgCor = cor.rolos.reduce((rs, r) => rs + (parseFloat(r.kg)     || 0), 0);
+          return s + (kgpm > 0 ? mCor * kgpm : kgCor);
+        }
+        return s + cor.rolos.reduce((rs, r) => rs + (parseFloat(r.kg) || 0), 0);
       }
-      // compatibilidade com formato antigo (pecas x peso_por_peca)
       if (cor.pecas !== undefined) {
         const totalUn = (cor.pecas || 1) * (parseFloat(cor.peso_por_peca) || 0);
         return s + (un === 'metros' ? totalUn * kgpm : totalUn);
@@ -4663,13 +4666,30 @@ function calcEntradaKgTotal(entrada) {
   return parseFloat(entrada.quantidade_kg) || 0;
 }
 
+function calcEntradaMetrosTotal(entrada) {
+  if ((entrada.tipo_unidade || 'kg') !== 'metros') return 0;
+  if (!entrada.cores || !entrada.cores.length) return 0;
+  return entrada.cores.reduce((s, cor) => {
+    if (cor.rolos && cor.rolos.length)
+      return s + cor.rolos.reduce((rs, r) => rs + (parseFloat(r.metros) || 0), 0);
+    return s + (parseFloat(cor.quantidade) || 0);
+  }, 0);
+}
+
 function saldoTecido(tid) {
-  const entradasTec = entradasEstoque.filter(e => e.tecido_id === tid);
+  const entradasTec  = entradasEstoque.filter(e => e.tecido_id === tid);
   const totalEntrada = entradasTec.reduce((s, e) => s + calcEntradaKgTotal(e), 0);
+  const totalEntradaM= entradasTec.reduce((s, e) => s + calcEntradaMetrosTotal(e), 0);
+  const usaMetros    = entradasTec.some(e => (e.tipo_unidade || 'kg') === 'metros');
   const totalEnviado = ordens
     .filter(o => o.tecido_id === tid && o.status !== 'cancelada')
     .reduce((s, o) => s + (parseFloat(o.kg_enviado) || 0), 0);
-  return { entradas: totalEntrada, enviado: totalEnviado, saldo: totalEntrada - totalEnviado };
+  return {
+    entradas: totalEntrada, entradas_m: totalEntradaM,
+    enviado: totalEnviado,
+    saldo: totalEntrada - totalEnviado, saldo_m: totalEntradaM,
+    usaMetros
+  };
 }
 
 function renderEstoque() {
@@ -4695,16 +4715,22 @@ function renderEstoque() {
     tb.innerHTML = `<tr><td colspan="8" style="text-align:center;color:#94a3b8;padding:24px">Nenhum tecido cadastrado. Clique em "+ Cadastrar Tecido".</td></tr>`;
   } else {
     tb.innerHTML = tecidos.map(t => {
-      const { entradas, enviado, saldo } = saldoTecido(t.id);
-      const statusColor = saldo > 10 ? '#16a34a' : saldo > 0 ? '#d97706' : '#dc2626';
-      const statusLabel = saldo > 10 ? '🟢 OK' : saldo > 0 ? '🟡 Baixo' : '🔴 Zerado';
+      const { entradas, entradas_m, enviado, saldo, saldo_m, usaMetros } = saldoTecido(t.id);
+      // para metros: alerta quando < 5 m; para kg: quando < 10 kg
+      const statusOk    = usaMetros ? saldo_m > 5  : saldo > 10;
+      const statusBaixo = usaMetros ? saldo_m > 0  : saldo > 0;
+      const statusColor = statusOk ? '#16a34a' : statusBaixo ? '#d97706' : '#dc2626';
+      const statusLabel = statusOk ? '🟢 OK'  : statusBaixo ? '🟡 Baixo' : '🔴 Zerado';
+      const entStr  = usaMetros ? `${entradas_m.toFixed(1)} m` : `${entradas.toFixed(1)} kg`;
+      const envStr  = usaMetros ? `—`                          : `${enviado.toFixed(1)} kg`;
+      const saldoStr= usaMetros ? `${saldo_m.toFixed(1)} m`   : `${saldo.toFixed(1)} kg`;
       return `<tr>
         <td><strong>${t.nome}</strong></td>
         <td style="color:#64748b;font-size:.82rem">${t.composicao || '—'}</td>
         <td style="color:#64748b;font-size:.82rem">${t.largura_cm ? t.largura_cm + ' cm' : '—'}</td>
-        <td style="text-align:right">${entradas.toFixed(1)} kg</td>
-        <td style="text-align:right">${enviado.toFixed(1)} kg</td>
-        <td style="text-align:right;font-weight:700;color:${statusColor}">${saldo.toFixed(1)} kg</td>
+        <td style="text-align:right">${entStr}</td>
+        <td style="text-align:right">${envStr}</td>
+        <td style="text-align:right;font-weight:700;color:${statusColor}">${saldoStr}</td>
         <td><span style="color:${statusColor};font-weight:600">${statusLabel}</span></td>
         <td>
           <button class="btn btn-secondary btn-sm" onclick="openEntradaEstoqueModal('${t.id}')">+ Entrada</button>
@@ -4743,22 +4769,30 @@ function renderEstoque() {
       const forn = e.fornecedor_id ? getFornecedor(e.fornecedor_id) : null;
       const fornNome = forn ? forn.nome : (e.fornecedor || '—');
       const totalKg = calcEntradaKgTotal(e);
+      const totalM  = calcEntradaMetrosTotal(e);
       const unidade = e.tipo_unidade || 'kg';
+      const qtdExibida = unidade === 'metros'
+        ? `${totalM.toFixed(1)} m${totalKg > 0 ? ` (${totalKg.toFixed(1)} kg)` : ''}`
+        : `${totalKg.toFixed(1)} kg`;
       const coresList = (e.cores && e.cores.length)
         ? e.cores.map(c => {
             const n      = (c.rolos && c.rolos.length) ? c.rolos.length : (c.pecas || '?');
+            const mCor   = (c.rolos && c.rolos.length)
+              ? c.rolos.reduce((s, r) => s + (parseFloat(r.metros) || 0), 0)
+              : 0;
             const kgCor  = (c.rolos && c.rolos.length)
               ? c.rolos.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0).toFixed(1)
               : ((c.pecas || 1) * (parseFloat(c.peso_por_peca) || 0)).toFixed(1);
+            const qtdCor = unidade === 'metros' ? `${mCor.toFixed(1)} m` : `${kgCor} kg`;
             const oficBadge = c.oficina ? ` @ ${c.oficina}` : '';
-            return `<span style="display:inline-block;background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:.78rem;margin:1px">${c.cor}: ${n} rolo${n !== 1 ? 's' : ''} / ${kgCor} kg${oficBadge}</span>`;
+            return `<span style="display:inline-block;background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:.78rem;margin:1px">${c.cor}: ${n} rolo${n !== 1 ? 's' : ''} / ${qtdCor}${oficBadge}</span>`;
           }).join('')
         : `<span style="font-size:.82rem;color:#64748b">${e.cor || '—'}</span>`;
       return `<tr>
         <td>${fmtDate(e.data)}</td>
         <td><strong>${tec ? tec.nome : '—'}</strong></td>
         <td>${coresList}</td>
-        <td style="text-align:right;font-weight:600">${totalKg.toFixed(1)} kg</td>
+        <td style="text-align:right;font-weight:600">${qtdExibida}</td>
         <td style="color:#64748b;font-size:.82rem">${fornNome}</td>
         <td style="color:#64748b;font-size:.82rem">${e.nf || '—'}</td>
         <td>
